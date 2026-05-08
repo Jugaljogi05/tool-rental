@@ -139,6 +139,7 @@ export const deleteMockItem = (id) => mockItems.delete(`${id}`);
 export const listMockNearbyItems = ({ lat, lng, q, category, radiusKm = 5 }) => {
   const hasLocation = !Number.isNaN(Number(lat)) && !Number.isNaN(Number(lng));
   const userPoint = hasLocation ? { lat: Number(lat), lng: Number(lng) } : null;
+  const safeRadiusKm = Math.min(10, Math.max(1, Number(radiusKm) || 5));
 
   return Array.from(mockItems.values())
     .filter((item) => item.isActive && item.availabilityStatus === "Available")
@@ -154,6 +155,12 @@ export const listMockNearbyItems = ({ lat, lng, q, category, radiusKm = 5 }) => 
         distanceKm,
       };
     })
-    .filter((item) => (hasLocation ? item.distanceKm <= Number(radiusKm) : true))
+    .filter((item) => (hasLocation ? item.distanceKm <= safeRadiusKm : true))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 };
+
+export const listMockRecommendationCandidates = ({ excludeItemId } = {}) =>
+  Array.from(mockItems.values())
+    .filter((item) => item.isActive && item.availabilityStatus === "Available")
+    .filter((item) => `${item._id}` !== `${excludeItemId || ""}`)
+    .map((item) => withOwner(item));

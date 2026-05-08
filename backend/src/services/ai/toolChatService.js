@@ -1,3 +1,5 @@
+import { extractGeminiText, extractJsonObject, extractLooseString, getGeminiFinishReason } from "./responseParsing.js";
+
 const getGeminiApiKey = () => process.env.GEMINI_API_KEY || "";
 const getGeminiModel = () => process.env.AI_TOOL_CHAT_GEMINI_MODEL || "gemini-2.5-flash";
 const getTimeoutMs = () => Number(process.env.AI_TOOL_CHAT_TIMEOUT_MS || 12000);
@@ -41,9 +43,25 @@ const postJson = async (url, payload, headers, timeoutMs, timeoutMessage) => {
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => "");
+    let exactReason = errorText.slice(0, 300) || "Unknown error";
+
+    try {
+      const parsedError = JSON.parse(errorText);
+      exactReason =
+        parsedError?.error?.message ||
+        parsedError?.message ||
+        parsedError?.error?.status ||
+        exactReason;
+      if (parsedError?.error?.code) {
+        exactReason = `HTTP ${parsedError.error.code}: ${exactReason}`;
+      }
+    } catch {
+      // Keep the raw truncated body when Gemini does not send JSON.
+    }
+
     return {
       ok: false,
-      reason: `AI request failed (${response.status}): ${errorText.slice(0, 180) || "Unknown error"}`,
+      reason: `AI request failed (${response.status}): ${exactReason}`,
     };
   }
 
@@ -54,102 +72,71 @@ const postJson = async (url, payload, headers, timeoutMs, timeoutMessage) => {
   }
 };
 
-const extractJsonObject = (text = "") => {
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) return null;
-  try {
-    return JSON.parse(text.slice(start, end + 1));
-  } catch {
-    return null;
-  }
+const buildPrompt = ({ itemTitle, itemDescription, category, userQuestion }) => [
+  "You are an expert assistant that explains how to use rental items safely and practically.",
+  "Answer the user's question using the specific item details below.",
+  "The answer must be tailored to the item, not generic or copied from a fixed template.",
+  "Explain what the item is used for, how to operate it, and any important safety tips.",
+  "If the question is unclear, ask for clarification inside the answer.",
+  "If there are unknowns, say to check the manual or a professional.",
+  "Avoid harmful or unsafe instructions.",
+  "Return only valid JSON with this exact shape: {\"answer\":\"text response\"}",
+  `Item title: ${itemTitle || ""}`,
+  `Item description: ${itemDescription || ""}`,
+  `Category: ${category || ""}`,
+  `User question: ${userQuestion || ""}`,
+].join("\n");
+
+const buildContinuationPrompt = ({ rawText }) => [
+  "Continue the previous Gemini response from where it stopped.",
+  "Do not repeat the opening brace or any already written text.",
+  "Return only the missing remainder needed to complete the same JSON object.",
+  `Partial response so far: ${rawText || ""}`,
+].join("\n");
+
+const isLikelyTruncated = (data = {}, rawText = "") => {
+  const finishReason = getGeminiFinishReason(data).toUpperCase();
+  if (finishReason === "MAX_TOKENS" || finishReason === "LENGTH") return true;
+  const trimmed = `${rawText || ""}`.trim();
+  return trimmed === "{" || trimmed === "[" || trimmed.endsWith(':"') || trimmed.endsWith('":');
 };
 
-const extractGeminiText = (data = {}) => {
-  const parts = data.candidates?.[0]?.content?.parts;
-  if (!Array.isArray(parts)) return "";
-  return parts.map((part) => `${part?.text || ""}`.trim()).filter(Boolean).join("\n").trim();
-};
+const requestContinuation = async ({ geminiKey, rawText }) => {
+  const response = await postJson(
+    `https://generativelanguage.googleapis.com/v1beta/models/${getGeminiModel()}:generateContent`,
+    {
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: buildContinuationPrompt({ rawText }) }],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 600,
+        responseMimeType: "application/json",
+      },
+    },
+    { "x-goog-api-key": geminiKey },
+    getTimeoutMs(),
+    "Tool chat continuation timed out."
+  );
 
-const buildFallbackAnswer = ({ itemTitle, itemDescription, category, userQuestion }) => {
-  const title = `${itemTitle || "this item"}`.trim();
-  const cat = `${category || ""}`.trim().toLowerCase();
-  const question = `${userQuestion || ""}`.trim().toLowerCase();
-
-  const generalSteps = [
-    `1. Inspect ${title} before starting.`,
-    "2. Put on any needed safety gear.",
-    "3. Read the manual or labels first.",
-    "4. Start on the lowest safe setting.",
-    "5. Stop immediately if something feels unsafe.",
-  ];
-
-  const safetyNotes = [
-    "Keep hands clear of moving parts.",
-    "Unplug or power off before adjusting attachments.",
-    "Work in a clear, dry area.",
-  ];
-
-  if (/\b(drill|power drill|cordless drill)\b/.test(`${title} ${itemDescription}`.toLowerCase())) {
-    return [
-      `You can use ${title} for drilling holes in wood, metal, or drywall.`,
-      "1. Fit the correct drill bit tightly.",
-      "2. Mark the spot and hold the drill straight.",
-      "3. Start slowly, then increase speed gently.",
-      "Safety: wear eye protection and keep fingers away from the bit.",
-      "If you're unsure about the material, check the manual or ask a professional.",
-    ].join(" ");
+  if (!response.ok) {
+    return "";
   }
 
-  if (/\bladder\b/.test(`${title} ${itemDescription}`.toLowerCase())) {
-    return [
-      `Use ${title} on flat, stable ground only.`,
-      "1. Open it fully and lock the spreader.",
-      "2. Test stability before climbing.",
-      "3. Keep your body centered and three points of contact.",
-      "Safety: never stand on the top rung.",
-      "If the ladder feels unstable, stop and check the manual or professional help.",
-    ].join(" ");
-  }
-
-  if (question.includes("how") || question.includes("use") || question.includes("operate")) {
-    return [
-      `Here is a simple way to use ${title}:`,
-      ...generalSteps,
-      `Safety tips: ${safetyNotes.join(" ")}`,
-      "If you're unsure, check the manual or professional help.",
-    ].join(" ");
-  }
-
-  return `I can give basic guidance for ${title}, but for exact steps and safety limits, check the manual or professional help.`;
+  return extractGeminiText(response.data);
 };
 
 export const generateToolChatAnswer = async ({ itemTitle, itemDescription, category, userQuestion }) => {
   const geminiKey = getGeminiApiKey();
   if (!geminiKey) {
     return {
-      ok: true,
-      answer: buildFallbackAnswer({ itemTitle, itemDescription, category, userQuestion }),
-      source: "fallback",
+      ok: false,
+      reason: "GEMINI_API_KEY is not set for tool guidance.",
     };
   }
-
-  const prompt = [
-    "You are an assistant that explains how to use tools safely.",
-    "Given an item, explain:",
-    "- what it is used for",
-    "- step-by-step usage",
-    "- safety tips",
-    "Keep it simple for beginners.",
-    "Avoid technical jargon unless necessary.",
-    "If unsure, say: Check manual or professional help.",
-    "Do NOT give harmful instructions.",
-    `Item title: ${itemTitle || ""}`,
-    `Item description: ${itemDescription || ""}`,
-    `Category: ${category || ""}`,
-    `User question: ${userQuestion || ""}`,
-    'Return ONLY valid JSON in this exact shape: {"answer":"text response"}',
-  ].join("\n");
 
   const response = await postJson(
     `https://generativelanguage.googleapis.com/v1beta/models/${getGeminiModel()}:generateContent`,
@@ -157,12 +144,12 @@ export const generateToolChatAnswer = async ({ itemTitle, itemDescription, categ
       contents: [
         {
           role: "user",
-          parts: [{ text: prompt }],
+          parts: [{ text: buildPrompt({ itemTitle, itemDescription, category, userQuestion }) }],
         },
       ],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 300,
+        maxOutputTokens: 600,
         responseMimeType: "application/json",
       },
     },
@@ -173,22 +160,44 @@ export const generateToolChatAnswer = async ({ itemTitle, itemDescription, categ
 
   if (!response.ok) {
     return {
-      ok: true,
-      answer: buildFallbackAnswer({ itemTitle, itemDescription, category, userQuestion }),
-      source: "fallback",
+      ok: false,
       reason: response.reason,
     };
   }
 
   const rawText = extractGeminiText(response.data);
   const parsed = extractJsonObject(rawText);
-  const answer = `${parsed?.answer || ""}`.trim();
+  const trimmedRawText = `${rawText || ""}`.trim();
+  const answer =
+    `${parsed?.answer || ""}`.trim() ||
+    `${extractLooseString(rawText, "answer") || ""}`.trim() ||
+    (trimmedRawText && !trimmedRawText.startsWith("{") && !trimmedRawText.startsWith("[") ? trimmedRawText : "");
+
+  if (!answer && isLikelyTruncated(response.data, rawText)) {
+    const continuationText = await requestContinuation({ geminiKey, rawText });
+    const combinedText = `${rawText || ""}${continuationText || ""}`.trim();
+    const continuedParsed = extractJsonObject(combinedText);
+    const trimmedCombinedText = `${combinedText || ""}`.trim();
+    const continuedAnswer =
+      `${continuedParsed?.answer || ""}`.trim() ||
+      `${extractLooseString(combinedText, "answer") || ""}`.trim() ||
+      (trimmedCombinedText && !trimmedCombinedText.startsWith("{") && !trimmedCombinedText.startsWith("[")
+        ? trimmedCombinedText
+        : "");
+
+    if (continuedAnswer) {
+      return {
+        ok: true,
+        answer: continuedAnswer,
+        source: "ai",
+      };
+    }
+  }
+
   if (!answer) {
     return {
-      ok: true,
-      answer: buildFallbackAnswer({ itemTitle, itemDescription, category, userQuestion }),
-      source: "fallback",
-      reason: "AI response was invalid.",
+      ok: false,
+      reason: `Gemini returned no usable answer. Raw response: ${rawText.slice(0, 300) || "empty response"}`,
     };
   }
 

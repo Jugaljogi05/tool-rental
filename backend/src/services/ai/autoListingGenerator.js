@@ -3,6 +3,7 @@ import os from "os";
 import path from "path";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
+import { extractGeminiText, extractJsonObject } from "./responseParsing.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -70,22 +71,9 @@ const postJson = async (url, payload, headers, timeoutMs, timeoutMessage) => {
   }
 };
 
-const extractJsonObject = (text = "") => {
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) return null;
-  try {
-    return JSON.parse(text.slice(start, end + 1));
-  } catch {
-    return null;
-  }
-};
-
 const extractText = (data = {}, provider = "gemini") => {
   if (provider === "gemini") {
-    const parts = data.candidates?.[0]?.content?.parts;
-    if (!Array.isArray(parts)) return "";
-    return parts.map((part) => `${part?.text || ""}`.trim()).filter(Boolean).join("\n").trim();
+    return extractGeminiText(data);
   }
 
   if (typeof data.output_text === "string" && data.output_text.trim()) {

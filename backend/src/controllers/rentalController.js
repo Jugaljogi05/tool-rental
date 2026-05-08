@@ -1,6 +1,8 @@
 import path from "path";
 import Item from "../models/Item.js";
 import Rental from "../models/Rental.js";
+import Review from "../models/Review.js";
+import Dispute from "../models/Dispute.js";
 import User from "../models/User.js";
 import AppError from "../utils/AppError.js";
 import catchAsync from "../utils/catchAsync.js";
@@ -50,6 +52,41 @@ const decorateRental = (rentalDoc) => {
     ...rental,
     ...buildOverdueMeta(rental),
   };
+};
+
+const attachUserReviews = async ({ rentals, userId }) => {
+  if (!rentals.length) return rentals;
+
+  const rentalIds = rentals.map((rental) => rental._id);
+  const reviews = await Review.find({
+    rentalId: { $in: rentalIds },
+    reviewerId: userId,
+  }).sort({ createdAt: -1 });
+
+  const reviewByRentalId = new Map(
+    reviews.map((review) => [String(review.rentalId), review.toObject ? review.toObject() : review])
+  );
+
+  return rentals.map((rental) => ({
+    ...rental,
+    myReview: reviewByRentalId.get(String(rental._id)) || null,
+  }));
+};
+
+const attachDisputes = async ({ rentals }) => {
+  if (!rentals.length) return rentals;
+
+  const rentalIds = rentals.map((rental) => rental._id);
+  const disputes = await Dispute.find({ rentalId: { $in: rentalIds } }).sort({ createdAt: -1 });
+
+  const disputeByRentalId = new Map(
+    disputes.map((dispute) => [String(dispute.rentalId), dispute.toObject ? dispute.toObject() : dispute])
+  );
+
+  return rentals.map((rental) => ({
+    ...rental,
+    dispute: disputeByRentalId.get(String(rental._id)) || null,
+  }));
 };
 
 const getVideoUrl = (req) => {
@@ -401,10 +438,18 @@ export const getMyRentals = catchAsync(async (req, res) => {
     .populate("ownerId", "name ratingAverage trustScore")
     .sort({ createdAt: -1 });
 
+  const rentalsWithReviews = await attachUserReviews({
+    rentals: rentals.map(decorateRental),
+    userId: req.user._id,
+  });
+  const rentalsWithDisputes = await attachDisputes({
+    rentals: rentalsWithReviews,
+  });
+
   res.status(200).json({
     status: "success",
     results: rentals.length,
-    data: { rentals: rentals.map(decorateRental) },
+    data: { rentals: rentalsWithDisputes },
   });
 });
 
@@ -414,8 +459,16 @@ export const getRentalById = catchAsync(async (req, res, next) => {
     userId: req.user._id,
   });
 
+  const rentalsWithReviews = await attachUserReviews({
+    rentals: [decorateRental(rental)],
+    userId: req.user._id,
+  });
+  const rentalsWithDisputes = await attachDisputes({
+    rentals: rentalsWithReviews,
+  });
+
   res.status(200).json({
     status: "success",
-    data: { rental: decorateRental(rental) },
+    data: { rental: rentalsWithDisputes[0] },
   });
 });

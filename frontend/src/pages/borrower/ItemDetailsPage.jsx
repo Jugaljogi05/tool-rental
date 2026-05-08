@@ -436,6 +436,7 @@ const ItemDetailsPage = () => {
     setRecommendationsError("");
     try {
       const res = await aiApi.recommendations({
+        itemId: currentItem._id,
         itemTitle: currentItem.name,
         category: currentItem.category,
         description: currentItem.description,
@@ -525,12 +526,24 @@ const ItemDetailsPage = () => {
         category: item.category,
         userQuestion: question,
       });
-      const answer = res.data.data.answer || "Check manual or professional help.";
+      const answer = res.data.data.answer || "";
+      if (!answer) {
+        const reason = res.data?.meta?.reason || "Unable to get AI guidance right now.";
+        setChatMessages((prev) => [
+          ...prev,
+          { role: "assistant", text: `AI guidance is unavailable right now: ${reason}` },
+        ]);
+        setChatError(reason);
+        return;
+      }
       setChatMessages((prev) => [...prev, { role: "assistant", text: answer }]);
     } catch (err) {
-      const fallback = err.response?.data?.message || "Check manual or professional help.";
-      setChatMessages((prev) => [...prev, { role: "assistant", text: fallback }]);
-      setChatError(err.response?.data?.message || "Unable to get tool guidance right now.");
+      const reason = err.response?.data?.message || "Unable to get AI guidance right now.";
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: `AI guidance is unavailable right now: ${reason}` },
+      ]);
+      setChatError(reason);
     } finally {
       setChatSending(false);
     }
@@ -689,7 +702,7 @@ const ItemDetailsPage = () => {
         </div>
 
         <div className="animate-fade-up-delay-2 rounded-2xl border border-zinc-700 bg-zinc-900/70 p-4 backdrop-blur-sm">
-          <h3 className="font-display text-lg font-bold">You may also need</h3>
+          <h3 className="font-display text-lg font-bold">You may also like to rent</h3>
           {recommendationsLoading ? <p className="mt-3 text-sm text-zinc-300">Loading suggestions...</p> : null}
           {recommendationsError ? <p className="mt-3 text-sm text-red-600">{recommendationsError}</p> : null}
           {!recommendationsLoading && !recommendationsError && recommendations.length ? (

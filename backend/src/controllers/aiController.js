@@ -43,26 +43,52 @@ export const toolChat = catchAsync(async (req, res) => {
     userQuestion,
   });
 
+  if (!result.ok) {
+    return res.status(200).json({
+      success: true,
+      data: { answer: "" },
+      meta: {
+        source: "ai",
+        reason: result.reason || "",
+      },
+    });
+  }
+
   res.status(200).json({
     success: true,
     data: { answer: result.answer },
     meta: {
-      source: result.source || "fallback",
+      source: result.source || "ai",
       reason: result.reason || "",
     },
   });
 });
 
 export const recommendations = catchAsync(async (req, res) => {
+  const itemId = typeof req.body.itemId === "string" ? req.body.itemId.trim() : "";
   const itemTitle = typeof req.body.itemTitle === "string" ? req.body.itemTitle.trim() : "";
   const description = typeof req.body.description === "string" ? req.body.description.trim() : "";
   const category = typeof req.body.category === "string" ? req.body.category.trim() : "";
 
   const result = await generateRecommendations({
+    itemId,
     itemTitle,
     category,
     description,
   });
+
+  if (!result.ok) {
+    return res.status(200).json({
+      success: true,
+      data: {
+        recommendations: [],
+      },
+      meta: {
+        source: "ai",
+        reason: result.reason || "",
+      },
+    });
+  }
 
   res.status(200).json({
     success: true,
@@ -70,7 +96,7 @@ export const recommendations = catchAsync(async (req, res) => {
       recommendations: result.recommendations,
     },
     meta: {
-      source: result.source || "fallback",
+      source: result.source || "ai",
       reason: result.reason || "",
     },
   });

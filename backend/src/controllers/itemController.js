@@ -99,6 +99,13 @@ const mapItemDistances = ({ items, lat, lng }) =>
     return { ...plain, distanceKm };
   });
 
+const clampRadiusKm = (value) => {
+  const fallback = Number(process.env.DEFAULT_RADIUS_KM || 5);
+  const parsed = Number(value);
+  const safeValue = Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  return Math.min(10, Math.max(1, safeValue));
+};
+
 const fetchNearbyItems = async ({ lat, lng, category, radiusKm, q }) => {
   if (isMockAuthEnabled()) {
     return listMockNearbyItems({
@@ -215,7 +222,7 @@ export const createItem = catchAsync(async (req, res, next) => {
 });
 
 export const listNearbyItems = catchAsync(async (req, res) => {
-  const radiusKm = Number(req.query.radiusKm || process.env.DEFAULT_RADIUS_KM || 5);
+  const radiusKm = clampRadiusKm(req.query.radiusKm);
   const lat = Number(req.query.lat);
   const lng = Number(req.query.lng);
   const category = req.query.category;

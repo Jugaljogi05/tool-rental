@@ -25,6 +25,54 @@ const recomputeTrust = async (userId) => {
   await user.save();
 };
 
+const finalizeDisputedRental = async ({
+  dispute,
+  rental,
+  verdict,
+  resolutionNotes,
+  resolvedBy,
+  status = "Resolved",
+}) => {
+  dispute.status = status;
+  dispute.verdict = verdict;
+  dispute.resolutionNotes = resolutionNotes || "";
+  dispute.resolvedBy = resolvedBy;
+  await dispute.save();
+
+  rental.rentalStatus = "Completed";
+  if (verdict === "borrower_fault") {
+    rental.depositStatus = "Forfeited";
+    await User.findByIdAndUpdate(rental.borrowerId, { $inc: { failedDisputes: 1 } });
+    await recomputeTrust(rental.borrowerId);
+  } else {
+    const refundAmount = Number(rental.lenderEarnings || rental.rentAmount || 0);
+    rental.depositStatus = "Released";
+    rental.payment.status = "Refunded";
+    rental.lenderEarnings = 0;
+    if (refundAmount > 0) {
+      if (isMockAuthEnabled()) {
+        updateMockUserBalance(rental.ownerId, -refundAmount);
+      } else {
+        await User.findByIdAndUpdate(rental.ownerId, {
+          $inc: { lenderBalance: -refundAmount },
+        });
+      }
+    }
+    if (verdict === "lender_fault") {
+      await User.findByIdAndUpdate(rental.ownerId, { $inc: { failedDisputes: 1 } });
+      await recomputeTrust(rental.ownerId);
+    }
+  }
+
+  await rental.save();
+  if (rental.itemId) {
+    rental.itemId.availabilityStatus = "Available";
+    await rental.itemId.save();
+  }
+
+  return { dispute, rental };
+};
+
 export const createDispute = catchAsync(async (req, res, next) => {
   const { rentalId, reason } = req.body;
   if (!rentalId || !reason) return next(new AppError("rentalId and reason are required.", 400));
@@ -36,7 +84,7 @@ export const createDispute = catchAsync(async (req, res, next) => {
   if (!isBorrower && !isOwner) {
     return next(new AppError("You are not allowed to raise dispute for this rental.", 403));
   }
-  if (!["Active", "ReturnRequested", "Completed"].includes(rental.rentalStatus)) {
+  if (!["AwaitingPickupProof", "Active", "ReturnRequested", "Completed"].includes(rental.rentalStatus)) {
     return next(new AppError("Dispute cannot be raised at current rental status.", 409));
   }
 
@@ -60,6 +108,42 @@ export const createDispute = catchAsync(async (req, res, next) => {
   res.status(201).json({
     status: "success",
     data: { dispute },
+  });
+});
+
+export const settleDispute = catchAsync(async (req, res, next) => {
+  const { resolutionNotes } = req.body;
+  const dispute = await Dispute.findById(req.params.id);
+  if (!dispute) return next(new AppError("Dispute not found.", 404));
+  if (dispute.status === "Resolved" || dispute.status === "Rejected") {
+    return next(new AppError("Dispute already closed.", 409));
+  }
+
+  const rental = await Rental.findById(dispute.rentalId).populate("itemId");
+  if (!rental) return next(new AppError("Rental not found for this dispute.", 404));
+
+  const isBorrower = `${rental.borrowerId}` === `${req.user._id}`;
+  const isOwner = `${rental.ownerId}` === `${req.user._id}`;
+  const isAdmin = req.user.role === "admin";
+  if (!isBorrower && !isOwner && !isAdmin) {
+    return next(new AppError("You are not allowed to settle this dispute.", 403));
+  }
+
+  if (!["Disputed", "Completed"].includes(rental.rentalStatus)) {
+    return next(new AppError("Only disputed rentals can be settled.", 409));
+  }
+
+  const result = await finalizeDisputedRental({
+    dispute,
+    rental,
+    verdict: "mutual",
+    resolutionNotes: resolutionNotes || "Dispute settled and rental completed.",
+    resolvedBy: req.user._id,
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: result,
   });
 });
 
@@ -102,43 +186,21 @@ export const resolveDispute = catchAsync(async (req, res, next) => {
   const rental = await Rental.findById(dispute.rentalId).populate("itemId");
   if (!rental) return next(new AppError("Rental not found for this dispute.", 404));
 
-  dispute.status = status;
-  dispute.verdict = verdict;
-  dispute.resolutionNotes = resolutionNotes || "";
-  dispute.resolvedBy = req.user._id;
-  await dispute.save();
-
   if (status === "Resolved") {
-    rental.rentalStatus = "Completed";
-    if (verdict === "borrower_fault") {
-      rental.depositStatus = "Forfeited";
-      await User.findByIdAndUpdate(rental.borrowerId, { $inc: { failedDisputes: 1 } });
-      await recomputeTrust(rental.borrowerId);
-    } else {
-      const refundAmount = Number(rental.lenderEarnings || rental.rentAmount || 0);
-      rental.depositStatus = "Released";
-      rental.payment.status = "Refunded";
-      rental.lenderEarnings = 0;
-      if (refundAmount > 0) {
-        if (isMockAuthEnabled()) {
-          updateMockUserBalance(rental.ownerId, -refundAmount);
-        } else {
-          await User.findByIdAndUpdate(rental.ownerId, {
-            $inc: { lenderBalance: -refundAmount },
-          });
-        }
-      }
-      if (verdict === "lender_fault") {
-        await User.findByIdAndUpdate(rental.ownerId, { $inc: { failedDisputes: 1 } });
-        await recomputeTrust(rental.ownerId);
-      }
-    }
-  }
-
-  await rental.save();
-  if (rental.itemId) {
-    rental.itemId.availabilityStatus = "Available";
-    await rental.itemId.save();
+    await finalizeDisputedRental({
+      dispute,
+      rental,
+      verdict,
+      resolutionNotes,
+      resolvedBy: req.user._id,
+      status,
+    });
+  } else {
+    dispute.status = status;
+    dispute.verdict = verdict;
+    dispute.resolutionNotes = resolutionNotes || "";
+    dispute.resolvedBy = req.user._id;
+    await dispute.save();
   }
 
   res.status(200).json({

@@ -43,7 +43,9 @@ const BorrowerDashboard = () => {
     <DashboardLayout title="Borrower Dashboard">
       <div className="space-y-4">
         <div className="animate-fade-up flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-zinc-300">Showing items available within 5 km radius by default.</p>
+          <p className="text-sm text-zinc-300">
+            Showing items within {filters.radiusKm} km radius. Choose any distance from 1 km to 10 km.
+          </p>
           <MapToggle mode={mode} onChange={setMode} />
         </div>
         {searchMeta.semanticSearchUsed ? (

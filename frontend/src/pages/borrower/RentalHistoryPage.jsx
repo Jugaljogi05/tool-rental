@@ -356,6 +356,18 @@ const RentalHistoryPage = () => {
     }
   };
 
+  const settleDispute = async (rental) => {
+    try {
+      if (!window.confirm("Mark this dispute as settled and complete the rental?")) return;
+      await disputeApi.settle(rental.dispute._id, {
+        resolutionNotes: "Settled by the rental participants.",
+      });
+      loadRentals();
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to settle dispute.");
+    }
+  };
+
   return (
     <DashboardLayout title="My Rentals">
       <div className="space-y-4">
@@ -486,9 +498,12 @@ const RentalHistoryPage = () => {
               </div>
             ) : null}
 
-            {["ReturnRequested", "Completed", "Disputed"].includes(rental.rentalStatus) ? (
+            {["AwaitingPickupProof", "Active", "ReturnRequested", "Completed"].includes(rental.rentalStatus) ? (
               <div className="mt-3 rounded-xl border border-zinc-700 bg-zinc-950/80 p-3">
                 <p className="text-sm font-semibold">Need help? Raise dispute</p>
+                <p className="mt-1 text-xs text-zinc-400">
+                  You can open a dispute as soon as the item is picked up, without waiting for return.
+                </p>
                 <Input
                   label="Reason"
                   value={disputeDraft[rental._id]?.reason || ""}
@@ -518,34 +533,63 @@ const RentalHistoryPage = () => {
 
             {rental.rentalStatus === "Completed" ? (
               <div className="mt-3 rounded-xl border border-zinc-700 bg-zinc-950/80 p-3">
-                <p className="text-sm font-semibold">Leave rating/review</p>
-                <div className="grid gap-2 md:grid-cols-2">
-                  <Input
-                    label="Rating (1-5)"
-                    type="number"
-                    min="1"
-                    max="5"
-                    value={reviewDraft[rental._id]?.rating || "5"}
-                    onChange={(e) =>
-                      setReviewDraft((prev) => ({
-                        ...prev,
-                        [rental._id]: { ...prev[rental._id], rating: e.target.value },
-                      }))
-                    }
-                  />
-                  <Input
-                    label="Comment"
-                    value={reviewDraft[rental._id]?.comment || ""}
-                    onChange={(e) =>
-                      setReviewDraft((prev) => ({
-                        ...prev,
-                        [rental._id]: { ...prev[rental._id], comment: e.target.value },
-                      }))
-                    }
-                  />
-                </div>
-                <Button className="mt-2" onClick={() => submitReview(rental)}>
-                  Submit review
+                {rental.myReview ? (
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-300">Your review is submitted</p>
+                    <p className="mt-1 text-sm text-zinc-300">Rating: {rental.myReview.rating}/5</p>
+                    <p className="mt-1 text-sm text-zinc-300">
+                      Comment: {rental.myReview.comment || "No comment provided."}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold">Leave rating/review</p>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <Input
+                        label="Rating (1-5)"
+                        type="number"
+                        min="1"
+                        max="5"
+                        value={reviewDraft[rental._id]?.rating || "5"}
+                        onChange={(e) =>
+                          setReviewDraft((prev) => ({
+                            ...prev,
+                            [rental._id]: { ...prev[rental._id], rating: e.target.value },
+                          }))
+                        }
+                      />
+                      <Input
+                        label="Comment"
+                        value={reviewDraft[rental._id]?.comment || ""}
+                        onChange={(e) =>
+                          setReviewDraft((prev) => ({
+                            ...prev,
+                            [rental._id]: { ...prev[rental._id], comment: e.target.value },
+                          }))
+                        }
+                      />
+                    </div>
+                    <Button className="mt-2" onClick={() => submitReview(rental)}>
+                      Submit review
+                    </Button>
+                  </>
+                )}
+              </div>
+            ) : null}
+
+            {rental.rentalStatus === "Disputed" ? (
+              <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                <p className="text-sm font-semibold text-amber-200">Dispute in progress</p>
+                <p className="mt-1 text-xs text-amber-100/80">
+                  Once the issue is settled, you can complete the dispute and release the item for relisting or deletion.
+                </p>
+                <Button
+                  className="mt-3"
+                  variant="ghost"
+                  onClick={() => settleDispute(rental)}
+                  disabled={!rental.dispute?._id}
+                >
+                  Complete dispute
                 </Button>
               </div>
             ) : null}

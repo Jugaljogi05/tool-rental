@@ -1,9 +1,15 @@
+import { extractGeminiText, extractJsonObject, extractLooseString } from "./responseParsing.js";
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const GEMINI_MODEL = process.env.AI_SEARCH_GEMINI_MODEL || "gemini-2.5-flash";
 const GEMINI_EMBEDDING_MODEL =
   process.env.AI_SEARCH_GEMINI_EMBEDDING_MODEL || "gemini-embedding-001";
 const AI_SEARCH_TIMEOUT_MS = Number(process.env.AI_SEARCH_TIMEOUT_MS || 12000);
 const AI_SEARCH_MIN_SIMILARITY = Number(process.env.AI_SEARCH_MIN_SIMILARITY || 0.32);
 const AI_SEARCH_MAX_CANDIDATES = Number(process.env.AI_SEARCH_MAX_CANDIDATES || 60);
+const AI_SEARCH_QUERY_REWRITE_TIMEOUT_MS = Number(
+  process.env.AI_SEARCH_QUERY_REWRITE_TIMEOUT_MS || AI_SEARCH_TIMEOUT_MS
+);
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -78,6 +84,107 @@ const cosineSimilarity = (vectorA = [], vectorB = []) => {
 
 const normalizeText = (value) => `${value || ""}`.replace(/\s+/g, " ").trim();
 
+const buildSemanticQueryPrompt = (query) => `You help a rental marketplace search engine understand user intent.
+Rewrite the query into concise JSON only.
+
+Return this shape:
+{
+  "searchText": "short product-focused search phrase",
+  "keywords": ["term1", "term2", "term3"],
+  "intent": "short natural language intent",
+  "categoryHint": "optional broad category"
+}
+
+Rules:
+- Keep the output general and useful for matching related listings.
+- Do not invent specific accessories unless they are strongly implied.
+- Prefer product names, use cases, and synonyms.
+- Keep keywords short and practical.
+
+User query: ${query}`;
+
+const inferSemanticQueryPlan = async (query) => {
+  const normalizedQuery = normalizeText(query);
+  if (!normalizedQuery) {
+    return {
+      searchText: "",
+      keywords: [],
+      intent: "",
+      categoryHint: "",
+    };
+  }
+
+  if (!GEMINI_API_KEY) {
+    return {
+      searchText: normalizedQuery,
+      keywords: [],
+      intent: "",
+      categoryHint: "",
+    };
+  }
+
+  const response = await postJson(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    {
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: buildSemanticQueryPrompt(normalizedQuery) }],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 256,
+        responseMimeType: "application/json",
+      },
+    },
+    { "x-goog-api-key": GEMINI_API_KEY },
+    AI_SEARCH_QUERY_REWRITE_TIMEOUT_MS,
+    "Gemini semantic search request timed out."
+  );
+
+  if (!response.ok) {
+    return {
+      searchText: normalizedQuery,
+      keywords: [],
+      intent: "",
+      categoryHint: "",
+    };
+  }
+
+  const rawText = extractGeminiText(response.data);
+  const parsed = extractJsonObject(rawText) || {};
+  const searchText = normalizeText(
+    parsed.searchText ||
+      parsed.rewrittenQuery ||
+      parsed.query ||
+      extractLooseString(rawText, "searchText") ||
+      normalizedQuery
+  );
+  const intent = normalizeText(
+    parsed.intent || extractLooseString(rawText, "intent") || ""
+  );
+  const categoryHint = normalizeText(
+    parsed.categoryHint || extractLooseString(rawText, "categoryHint") || ""
+  );
+  const keywords = Array.isArray(parsed.keywords)
+    ? parsed.keywords
+        .map((keyword) => normalizeText(keyword))
+        .filter(Boolean)
+        .slice(0, 8)
+    : [];
+  const mergedKeywords = [...new Set([...keywords, ...searchText.split(/\s+/).slice(0, 5)])]
+    .filter(Boolean)
+    .slice(0, 8);
+
+  return {
+    searchText: searchText || normalizedQuery,
+    keywords: mergedKeywords,
+    intent,
+    categoryHint,
+  };
+};
+
 const buildItemSearchText = (item) => {
   const name = normalizeText(item?.name);
   const category = normalizeText(item?.category);
@@ -149,7 +256,18 @@ export const rankItemsBySemanticSearch = async ({ query, items = [] }) => {
     return { ok: true, items: [] };
   }
 
-  const texts = [normalizedQuery, ...candidates.map((item) => buildItemSearchText(item))];
+  const queryPlan = await inferSemanticQueryPlan(normalizedQuery);
+  const semanticQueryText = [
+    normalizedQuery,
+    queryPlan.searchText,
+    queryPlan.intent,
+    queryPlan.categoryHint,
+    queryPlan.keywords.join(" "),
+  ]
+    .filter(Boolean)
+    .join(". ");
+
+  const texts = [semanticQueryText, ...candidates.map((item) => buildItemSearchText(item))];
   const embeddingResults = await Promise.all(texts.map((text) => embedText(text)));
   const failure = embeddingResults.find((result) => !result.ok);
   if (failure) {

@@ -6,3 +6,5 @@ backend/uploads
 frontend/.env
 *.log
 .env.example
+__pycache__/
+*.pyc

@@ -59,6 +59,7 @@ export const disputeApi = {
     apiClient.post("/disputes", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
+  settle: (id, payload) => apiClient.patch(`/disputes/${id}/settle`, payload),
   resolve: (id, payload) => apiClient.patch(`/disputes/${id}/resolve`, payload),
 };
 
