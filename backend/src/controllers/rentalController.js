@@ -1,3 +1,4 @@
+import fs from "fs";
 import path from "path";
 import Item from "../models/Item.js";
 import Rental from "../models/Rental.js";
@@ -10,6 +11,7 @@ import { haversineDistanceKm } from "../utils/haversine.js";
 import { calculateLatePenalty, calculateRentAmount, getNumberOfDays } from "../utils/pricing.js";
 import { createNotification } from "../services/notificationService.js";
 import { isMockAuthEnabled, updateMockUserBalance } from "../services/mockAuthStore.js";
+import { isCloudinaryReady, uploadMediaFile } from "../services/cloudinary.js";
 
 const OVERDUE_STATUSES = new Set(["AwaitingPickupProof", "Active", "ReturnRequested"]);
 
@@ -93,6 +95,11 @@ const getVideoUrl = (req) => {
   if (!req.file) return "";
   const normalized = path.relative(process.cwd(), req.file.path).replace(/\\/g, "/");
   return `${process.env.UPLOAD_BASE_URL || ""}/${normalized}`;
+};
+
+const cleanupTempVideo = (filePath) => {
+  if (!filePath) return;
+  fs.unlink(filePath, () => {});
 };
 
 const getRentalWithAccessCheck = async ({ rentalId, userId }) => {
@@ -239,21 +246,43 @@ export const uploadBeforePickupVideo = catchAsync(async (req, res, next) => {
   }
   if (!req.file) return next(new AppError("Before pickup video is mandatory.", 400));
 
-  rental.borrowerBeforeVideo = getVideoUrl(req);
-  await rental.save();
+  try {
+    if (isCloudinaryReady()) {
+      const uploaded = await uploadMediaFile({
+        filePath: req.file.path,
+        resourceType: "video",
+        folder: "borrowly/rentals/before",
+      });
 
-  await createNotification({
-    userId: rental.ownerId,
-    type: "info",
-    title: "Pickup proof uploaded",
-    message: "Borrower uploaded before-pickup video proof.",
-    metadata: { rentalId: rental._id },
-  });
+      if (!uploaded.ok) {
+        return next(new AppError(uploaded.reason || "Unable to upload pickup proof.", 500));
+      }
 
-  res.status(200).json({
-    status: "success",
-    data: { rental },
-  });
+      rental.borrowerBeforeVideo = uploaded.data.secure_url || "";
+      rental.borrowerBeforeVideoPublicId = uploaded.data.public_id || "";
+    } else {
+      rental.borrowerBeforeVideo = getVideoUrl(req);
+    }
+
+    await rental.save();
+
+    await createNotification({
+      userId: rental.ownerId,
+      type: "info",
+      title: "Pickup proof uploaded",
+      message: "Borrower uploaded before-pickup video proof.",
+      metadata: { rentalId: rental._id },
+    });
+
+    res.status(200).json({
+      status: "success",
+      data: { rental },
+    });
+  } finally {
+    if (isCloudinaryReady()) {
+      cleanupTempVideo(req.file.path);
+    }
+  }
 });
 
 export const activateRental = catchAsync(async (req, res, next) => {
@@ -305,23 +334,45 @@ export const uploadAfterReturnVideo = catchAsync(async (req, res, next) => {
     return next(new AppError("After return video is mandatory.", 400));
   }
 
-  rental.borrowerAfterVideo = getVideoUrl(req);
-  rental.actualReturnDate = new Date();
-  rental.rentalStatus = "ReturnRequested";
-  await rental.save();
+  try {
+    if (isCloudinaryReady()) {
+      const uploaded = await uploadMediaFile({
+        filePath: req.file.path,
+        resourceType: "video",
+        folder: "borrowly/rentals/after",
+      });
 
-  await createNotification({
-    userId: rental.ownerId,
-    type: "info",
-    title: "Return requested",
-    message: "Borrower has uploaded return video and requested confirmation.",
-    metadata: { rentalId: rental._id },
-  });
+      if (!uploaded.ok) {
+        return next(new AppError(uploaded.reason || "Unable to upload return proof.", 500));
+      }
 
-  res.status(200).json({
-    status: "success",
-    data: { rental },
-  });
+      rental.borrowerAfterVideo = uploaded.data.secure_url || "";
+      rental.borrowerAfterVideoPublicId = uploaded.data.public_id || "";
+    } else {
+      rental.borrowerAfterVideo = getVideoUrl(req);
+    }
+
+    rental.actualReturnDate = new Date();
+    rental.rentalStatus = "ReturnRequested";
+    await rental.save();
+
+    await createNotification({
+      userId: rental.ownerId,
+      type: "info",
+      title: "Return requested",
+      message: "Borrower has uploaded return video and requested confirmation.",
+      metadata: { rentalId: rental._id },
+    });
+
+    res.status(200).json({
+      status: "success",
+      data: { rental },
+    });
+  } finally {
+    if (isCloudinaryReady()) {
+      cleanupTempVideo(req.file.path);
+    }
+  }
 });
 
 export const confirmReturn = catchAsync(async (req, res, next) => {

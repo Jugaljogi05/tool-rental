@@ -31,6 +31,10 @@ const itemSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    imagePublicIds: {
+      type: [String],
+      default: [],
+    },
     ownerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -58,6 +62,10 @@ const itemSchema = new mongoose.Schema(
       default: "Available",
     },
     workingConditionVideoURL: {
+      type: String,
+      default: "",
+    },
+    workingConditionVideoPublicId: {
       type: String,
       default: "",
     },

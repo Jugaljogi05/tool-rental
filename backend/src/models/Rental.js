@@ -86,7 +86,15 @@ const rentalSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    borrowerBeforeVideoPublicId: {
+      type: String,
+      default: "",
+    },
     borrowerAfterVideo: {
+      type: String,
+      default: "",
+    },
+    borrowerAfterVideoPublicId: {
       type: String,
       default: "",
     },

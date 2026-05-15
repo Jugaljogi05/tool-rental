@@ -20,10 +20,12 @@ export const createMockItem = ({
   pricePerDay,
   depositAmount,
   imageUrls = [],
+  imagePublicIds = [],
   ownerId,
   lat,
   lng,
   workingConditionVideoURL,
+  workingConditionVideoPublicId,
   aiVerification,
 }) => {
   const item = {
@@ -34,6 +36,7 @@ export const createMockItem = ({
     pricePerDay: toNumber(pricePerDay),
     depositAmount: toNumber(depositAmount),
     imageUrls: Array.isArray(imageUrls) ? imageUrls.filter(Boolean) : [],
+    imagePublicIds: Array.isArray(imagePublicIds) ? imagePublicIds.filter(Boolean) : [],
     ownerId: `${ownerId}`,
     location: {
       type: "Point",
@@ -41,6 +44,7 @@ export const createMockItem = ({
     },
     availabilityStatus: "Available",
     workingConditionVideoURL: workingConditionVideoURL || "",
+    workingConditionVideoPublicId: workingConditionVideoPublicId || "",
     aiVerification: aiVerification || {
       score: 0,
       isSuspicious: false,
@@ -98,6 +102,16 @@ export const updateMockItem = (id, updates = {}) => {
 
   if (updates.imageUrls !== undefined) {
     item.imageUrls = Array.isArray(updates.imageUrls) ? updates.imageUrls.filter(Boolean) : [];
+  }
+
+  if (updates.imagePublicIds !== undefined) {
+    item.imagePublicIds = Array.isArray(updates.imagePublicIds)
+      ? updates.imagePublicIds.filter(Boolean)
+      : [];
+  }
+
+  if (updates.workingConditionVideoPublicId !== undefined) {
+    item.workingConditionVideoPublicId = updates.workingConditionVideoPublicId || "";
   }
 
   if (updates.lat !== undefined && updates.lng !== undefined) {

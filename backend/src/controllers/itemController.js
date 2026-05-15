@@ -23,12 +23,20 @@ import {
 import AppError from "../utils/AppError.js";
 import catchAsync from "../utils/catchAsync.js";
 import { haversineDistanceKm } from "../utils/haversine.js";
+import {
+  destroyMediaFile,
+  extractCloudinaryPublicId,
+  isCloudinaryReady,
+  uploadMediaFile,
+} from "../services/cloudinary.js";
 
 const getUploadedUrl = (file) => {
   if (!file) return "";
   const normalized = path.relative(process.cwd(), file.path).replace(/\\/g, "/");
   return `${process.env.UPLOAD_BASE_URL || ""}/${normalized}`;
 };
+
+const getStoredMediaPublicId = (url = "", fallback = "") => fallback || extractCloudinaryPublicId(url);
 
 const getUploadedFiles = (req) => {
   const videoFile = req.files?.video?.[0] || null;
@@ -51,17 +59,68 @@ const getLocalPathFromUploadUrl = (uploadUrl = "") => {
   return path.join(process.cwd(), "uploads", relativeFromUploads);
 };
 
-const cleanupItemMediaFiles = (item) => {
-  const filePaths = [
-    getLocalPathFromUploadUrl(item?.workingConditionVideoURL || ""),
-    ...(Array.isArray(item?.imageUrls) ? item.imageUrls.map((url) => getLocalPathFromUploadUrl(url)) : []),
-  ]
-    .filter(Boolean)
-    .filter((value, index, array) => array.indexOf(value) === index);
+const uploadFilesToCloudinary = async (files = [], { resourceType, folder }) => {
+  if (!isCloudinaryReady()) return [];
 
-  filePaths.forEach((filePath) => {
-    fs.unlink(filePath, () => {});
+  const uploads = [];
+  try {
+    for (const file of files) {
+      // Sequential upload so we can roll back already-uploaded media if one fails.
+      // eslint-disable-next-line no-await-in-loop
+      const result = await uploadMediaFile({
+        filePath: file.path,
+        resourceType,
+        folder,
+      });
+      if (!result.ok) {
+        throw new Error(result.reason || "Cloudinary upload failed.");
+      }
+
+      uploads.push({
+        url: result.data.secure_url || "",
+        publicId: result.data.public_id || "",
+        resourceType: result.data.resource_type || resourceType,
+      });
+    }
+
+    return uploads;
+  } catch (error) {
+    await Promise.all(
+      uploads.map((upload) =>
+        destroyMediaFile({
+          publicId: upload.publicId,
+          resourceType: upload.resourceType,
+        }).catch(() => null)
+      )
+    );
+    throw error;
+  }
+};
+
+const cleanupStoredMedia = async (item) => {
+  const imageUrls = Array.isArray(item?.imageUrls) ? item.imageUrls : [];
+  const imagePublicIds = Array.isArray(item?.imagePublicIds) ? item.imagePublicIds : [];
+  const imageTasks = imageUrls.map((url, index) => {
+    const localPath = getLocalPathFromUploadUrl(url);
+    if (localPath) {
+      return new Promise((resolve) => fs.unlink(localPath, () => resolve()));
+    }
+
+    const publicId = getStoredMediaPublicId(url, imagePublicIds[index] || "");
+    if (!publicId) return Promise.resolve();
+    return destroyMediaFile({ publicId, resourceType: "image" }).catch(() => null);
   });
+
+  const videoUrl = item?.workingConditionVideoURL || "";
+  const videoPublicId = getStoredMediaPublicId(videoUrl, item?.workingConditionVideoPublicId || "");
+  const videoLocalPath = getLocalPathFromUploadUrl(videoUrl);
+  const videoTask = videoLocalPath
+    ? new Promise((resolve) => fs.unlink(videoLocalPath, () => resolve()))
+    : videoPublicId
+      ? destroyMediaFile({ publicId: videoPublicId, resourceType: "video" }).catch(() => null)
+      : Promise.resolve();
+
+  await Promise.all([...imageTasks, videoTask].filter(Boolean));
 };
 
 const buildNearbyDbFilter = ({ category, lat, lng, radiusKm, q }) => {
@@ -163,62 +222,96 @@ export const createItem = catchAsync(async (req, res, next) => {
     }
   }
 
-  const imageUrls = imageFiles.map((file) => getUploadedUrl(file));
-  const workingConditionVideoURL = getUploadedUrl(videoFile);
-  const aiVerification =
-    videoFile?.path && imageFiles.length
-      ? undefined
-      : {
-          score: 0,
-          isSuspicious: false,
-          status: "completed",
-          flags: ["video_not_provided"],
-          videoSignature: "",
-          checkedAt: new Date(),
-        };
+  try {
+    let imageUrls = [];
+    let imagePublicIds = [];
+    let workingConditionVideoURL = "";
+    let workingConditionVideoPublicId = "";
 
-  const item = isMockAuthEnabled()
-    ? createMockItem({
-        name,
-        description,
-        category,
-        pricePerDay,
-        depositAmount,
-        imageUrls,
-        ownerId: req.user._id,
-        lat,
-        lng,
-        workingConditionVideoURL,
-        aiVerification,
-      })
-    : await Item.create({
-        name,
-        description,
-        category,
-        pricePerDay: Number(pricePerDay),
-        depositAmount: Number(depositAmount),
-        imageUrls,
-        ownerId: req.user._id,
-        location: {
-          type: "Point",
-          coordinates: [Number(lng), Number(lat)],
-        },
-        workingConditionVideoURL,
-        aiVerification,
+    if (isCloudinaryReady()) {
+      const uploadedImages = await uploadFilesToCloudinary(imageFiles, {
+        resourceType: "image",
+        folder: "borrowly/items",
       });
+      imageUrls = uploadedImages.map((upload) => upload.url);
+      imagePublicIds = uploadedImages.map((upload) => upload.publicId);
 
-  if (videoFile) {
-    verifyItemVideoInBackground({
-      itemId: item._id,
-      videoPath: videoFile.path,
-      livenessPromptResponse: req.body.livenessPromptResponse,
+      if (videoFile) {
+        const uploadedVideo = await uploadFilesToCloudinary([videoFile], {
+          resourceType: "video",
+          folder: "borrowly/items/videos",
+        });
+        workingConditionVideoURL = uploadedVideo[0]?.url || "";
+        workingConditionVideoPublicId = uploadedVideo[0]?.publicId || "";
+      }
+    } else {
+      imageUrls = imageFiles.map((file) => getUploadedUrl(file));
+      workingConditionVideoURL = getUploadedUrl(videoFile);
+    }
+
+    const aiVerification =
+      videoFile?.path && imageFiles.length
+        ? undefined
+        : {
+            score: 0,
+            isSuspicious: false,
+            status: "completed",
+            flags: ["video_not_provided"],
+            videoSignature: "",
+            checkedAt: new Date(),
+          };
+
+    const item = isMockAuthEnabled()
+      ? createMockItem({
+          name,
+          description,
+          category,
+          pricePerDay,
+          depositAmount,
+          imageUrls,
+          imagePublicIds,
+          ownerId: req.user._id,
+          lat,
+          lng,
+          workingConditionVideoURL,
+          workingConditionVideoPublicId,
+          aiVerification,
+        })
+      : await Item.create({
+          name,
+          description,
+          category,
+          pricePerDay: Number(pricePerDay),
+          depositAmount: Number(depositAmount),
+          imageUrls,
+          imagePublicIds,
+          ownerId: req.user._id,
+          location: {
+            type: "Point",
+            coordinates: [Number(lng), Number(lat)],
+          },
+          workingConditionVideoURL,
+          workingConditionVideoPublicId,
+          aiVerification,
+        });
+
+    if (videoFile) {
+      verifyItemVideoInBackground({
+        itemId: item._id,
+        videoPath: videoFile.path,
+        livenessPromptResponse: req.body.livenessPromptResponse,
+      });
+    }
+
+    res.status(201).json({
+      status: "success",
+      data: { item },
     });
+  } finally {
+    if (isCloudinaryReady()) {
+      cleanupUploadedFiles(uploadedFilePaths);
+    }
   }
-
-  res.status(201).json({
-    status: "success",
-    data: { item },
-  });
 });
 
 export const listNearbyItems = catchAsync(async (req, res) => {
@@ -406,7 +499,7 @@ export const deleteItem = catchAsync(async (req, res, next) => {
   } else {
     await Item.deleteOne({ _id: item._id });
   }
-  cleanupItemMediaFiles(item);
+  await cleanupStoredMedia(item);
 
   res.status(200).json({
     status: "success",
