@@ -54,7 +54,7 @@ const ChatWindow = ({ rentalId, onClose, placement = "drawer" }) => {
     placement === "inline"
       ? "animate-fade-up flex h-[640px] min-h-[640px] flex-col overflow-hidden rounded-3xl border border-zinc-700 bg-zinc-950/95 p-4 shadow-2xl shadow-black/40 backdrop-blur-md"
       : placement === "overlay"
-        ? "animate-fade-up absolute right-4 top-4 z-30 flex h-[min(70vh,640px)] w-[min(420px,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-3xl border border-zinc-700 bg-zinc-950/95 p-4 shadow-2xl shadow-black/60 backdrop-blur-md"
+        ? "animate-fade-up absolute left-2 right-2 top-2 z-30 flex h-[min(78dvh,640px)] w-auto max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-3xl border border-zinc-700 bg-zinc-950/95 p-3 shadow-2xl shadow-black/60 backdrop-blur-md sm:left-auto sm:right-4 sm:top-4 sm:h-[min(70vh,640px)] sm:w-[min(420px,calc(100vw-2rem))] sm:p-4"
       : "animate-fade-up fixed bottom-4 left-4 right-4 z-50 flex h-[68vh] max-h-[720px] flex-col overflow-hidden rounded-3xl border border-zinc-700 bg-zinc-950/95 p-4 shadow-2xl shadow-black/60 backdrop-blur-md sm:left-auto sm:w-[min(420px,calc(100vw-2rem))] lg:bottom-6 lg:right-6 lg:h-[640px] lg:w-[420px]";
 
   return (
@@ -83,14 +83,16 @@ const ChatWindow = ({ rentalId, onClose, placement = "drawer" }) => {
           ))}
           {!messages.length ? <p className="text-xs text-zinc-500">No messages yet.</p> : null}
         </div>
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Type your message..."
             className="flex-1 rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-400"
           />
-          <Button onClick={sendMessage}>Send</Button>
+          <Button className="w-full sm:w-auto" onClick={sendMessage}>
+            Send
+          </Button>
         </div>
         {error ? <p className="mt-2 text-xs text-red-600">{error}</p> : null}
       </div>
