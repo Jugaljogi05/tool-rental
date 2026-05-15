@@ -161,7 +161,7 @@ export const createRentalRequest = catchAsync(async (req, res, next) => {
   const distanceKm = Number(
     haversineDistanceKm(borrowerLocation, { lat: itemLat, lng: itemLng }).toFixed(2)
   );
-  const allowedRadius = Number(process.env.DEFAULT_RADIUS_KM || 5);
+  const allowedRadius = Math.min(10, Math.max(1, Number(process.env.MAX_RENTAL_RADIUS_KM || 10)));
   if (distanceKm > allowedRadius) {
     return next(new AppError(`Item is outside ${allowedRadius} km service radius.`, 400));
   }
