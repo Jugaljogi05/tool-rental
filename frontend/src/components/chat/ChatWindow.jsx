@@ -46,7 +46,7 @@ const ChatWindow = ({ rentalId, onClose }) => {
   if (!rentalId) return null;
 
   return (
-    <section className="animate-fade-up fixed inset-x-4 bottom-4 top-20 z-50 overflow-hidden rounded-3xl border border-zinc-700 bg-zinc-950/95 p-4 shadow-2xl shadow-black/60 backdrop-blur-md lg:inset-y-6 lg:left-auto lg:right-6 lg:bottom-6 lg:top-6 lg:w-[420px]">
+    <section className="animate-fade-up fixed bottom-4 left-4 right-4 z-50 flex h-[68vh] max-h-[720px] flex-col overflow-hidden rounded-3xl border border-zinc-700 bg-zinc-950/95 p-4 shadow-2xl shadow-black/60 backdrop-blur-md sm:left-auto sm:w-[min(420px,calc(100vw-2rem))] lg:bottom-6 lg:right-6 lg:h-[640px] lg:w-[420px]">
       <div className="flex items-center justify-between gap-3 border-b border-zinc-800 pb-3">
         <div>
           <h3 className="font-display text-base font-bold">In-app chat</h3>
@@ -58,15 +58,15 @@ const ChatWindow = ({ rentalId, onClose }) => {
           </Button>
         ) : null}
       </div>
-      <div className="mt-3 flex h-[calc(100%-7.5rem)] flex-col">
-        <div className="flex-1 space-y-2 overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-900/80 p-2">
-        {messages.map((msg) => (
-          <div key={msg._id} className="rounded-lg border border-zinc-700 bg-zinc-900 p-2 text-xs">
-            <p className="font-semibold">{msg.senderId?.name}</p>
-            <p className="text-zinc-300">{msg.content}</p>
-          </div>
-        ))}
-        {!messages.length ? <p className="text-xs text-zinc-500">No messages yet.</p> : null}
+      <div className="mt-3 flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-900/80 p-2">
+          {messages.map((msg) => (
+            <div key={msg._id} className="rounded-lg border border-zinc-700 bg-zinc-900 p-2 text-xs">
+              <p className="font-semibold">{msg.senderId?.name}</p>
+              <p className="text-zinc-300">{msg.content}</p>
+            </div>
+          ))}
+          {!messages.length ? <p className="text-xs text-zinc-500">No messages yet.</p> : null}
           <div ref={messagesEndRef} />
         </div>
         <div className="mt-3 flex gap-2">
