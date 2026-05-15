@@ -40,9 +40,13 @@ const RentalHistoryPage = () => {
     if (!file) return;
     const formData = new FormData();
     formData.append("video", file);
-    if (type === "before") await rentalApi.uploadBeforeVideo(rentalId, formData);
-    else await rentalApi.uploadAfterVideo(rentalId, formData);
-    loadRentals();
+    try {
+      if (type === "before") await rentalApi.uploadBeforeVideo(rentalId, formData);
+      else await rentalApi.uploadAfterVideo(rentalId, formData);
+      await loadRentals();
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to upload video proof.");
+    }
   };
 
   const releaseItem = async (rentalId) => {

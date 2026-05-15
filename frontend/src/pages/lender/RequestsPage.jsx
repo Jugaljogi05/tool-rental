@@ -14,6 +14,9 @@ const OPEN_REQUEST_STATUSES = new Set([
   "ReturnRequested",
 ]);
 
+const hasReturnProof = (rental) =>
+  Boolean(`${rental?.borrowerAfterVideo || ""}`.trim() || `${rental?.borrowerAfterVideoPublicId || ""}`.trim());
+
 const RequestsPage = () => {
   const [rentals, setRentals] = useState([]);
   const [selectedChat, setSelectedChat] = useState("");
@@ -91,6 +94,19 @@ const RequestsPage = () => {
                 Open chat
               </Button>
             </div>
+
+            {rental.rentalStatus === "ReturnRequested" ? (
+              <div className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm">
+                <p className="font-semibold text-emerald-300">
+                  {hasReturnProof(rental) ? "Return proof received" : "Return proof missing"}
+                </p>
+                <p className="mt-1 text-zinc-200">
+                  {hasReturnProof(rental)
+                    ? "The borrower has uploaded the after-return video. You can release the item."
+                    : "Ask the borrower to re-upload the after-return video and refresh the page before confirming."}
+                </p>
+              </div>
+            ) : null}
           </article>
         ))}
         {!rentals.length ? <p className="text-sm text-zinc-400">No rental requests yet.</p> : null}

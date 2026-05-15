@@ -102,6 +102,9 @@ const cleanupTempVideo = (filePath) => {
   fs.unlink(filePath, () => {});
 };
 
+const hasReturnProof = (rental) =>
+  Boolean(`${rental?.borrowerAfterVideo || ""}`.trim() || `${rental?.borrowerAfterVideoPublicId || ""}`.trim());
+
 const getRentalWithAccessCheck = async ({ rentalId, userId }) => {
   const rental = await Rental.findById(rentalId).populate("itemId");
   if (!rental) throw new AppError("Rental not found.", 404);
@@ -384,7 +387,7 @@ export const confirmReturn = catchAsync(async (req, res, next) => {
   if (rental.rentalStatus !== "ReturnRequested") {
     return next(new AppError("Rental is not in return-request stage.", 409));
   }
-  if (!rental.borrowerAfterVideo) {
+  if (!hasReturnProof(rental)) {
     return next(new AppError("After return video is required before confirmation.", 400));
   }
 
