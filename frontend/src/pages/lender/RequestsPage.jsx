@@ -17,6 +17,9 @@ const OPEN_REQUEST_STATUSES = new Set([
 const hasReturnProof = (rental) =>
   Boolean(`${rental?.borrowerAfterVideo || ""}`.trim() || `${rental?.borrowerAfterVideoPublicId || ""}`.trim());
 
+const hasPickupProof = (rental) =>
+  Boolean(`${rental?.borrowerBeforeVideo || ""}`.trim() || `${rental?.borrowerBeforeVideoPublicId || ""}`.trim());
+
 const RequestsPage = () => {
   const [rentals, setRentals] = useState([]);
   const [selectedChat, setSelectedChat] = useState("");
@@ -94,6 +97,19 @@ const RequestsPage = () => {
                 Open chat
               </Button>
             </div>
+
+            {rental.rentalStatus === "AwaitingPickupProof" ? (
+              <div className="mt-3 rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-3 text-sm">
+                <p className="font-semibold text-cyan-300">
+                  {hasPickupProof(rental) ? "Pickup proof received" : "Pickup proof missing"}
+                </p>
+                <p className="mt-1 text-zinc-200">
+                  {hasPickupProof(rental)
+                    ? "The borrower has uploaded the before-pickup video. You can activate the rental."
+                    : "Ask the borrower to upload the before-pickup video and refresh the page before activating."}
+                </p>
+              </div>
+            ) : null}
 
             {rental.rentalStatus === "ReturnRequested" ? (
               <div className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm">

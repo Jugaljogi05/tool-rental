@@ -105,6 +105,9 @@ const cleanupTempVideo = (filePath) => {
 const hasReturnProof = (rental) =>
   Boolean(`${rental?.borrowerAfterVideo || ""}`.trim() || `${rental?.borrowerAfterVideoPublicId || ""}`.trim());
 
+const hasPickupProof = (rental) =>
+  Boolean(`${rental?.borrowerBeforeVideo || ""}`.trim() || `${rental?.borrowerBeforeVideoPublicId || ""}`.trim());
+
 const getRentalWithAccessCheck = async ({ rentalId, userId }) => {
   const rental = await Rental.findById(rentalId).populate("itemId");
   if (!rental) throw new AppError("Rental not found.", 404);
@@ -300,7 +303,7 @@ export const activateRental = catchAsync(async (req, res, next) => {
   if (!rental.depositPaid) {
     return next(new AppError("Deposit and rent payment is pending.", 409));
   }
-  if (!rental.borrowerBeforeVideo) {
+  if (!hasPickupProof(rental)) {
     return next(new AppError("Borrower before-pickup video is required.", 400));
   }
 
