@@ -385,309 +385,316 @@ const RentalHistoryPage = () => {
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         {info ? <p className="text-sm text-emerald-400">{info}</p> : null}
         {rentals.map((rental) => (
-          <article key={rental._id} className="card-lift animate-fade-up rounded-2xl border border-zinc-700 bg-zinc-900/70 p-4 backdrop-blur-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-display text-lg font-bold">{rental.itemId?.name}</h3>
-              <Badge>{rental.rentalStatus}</Badge>
-            </div>
-            <div className="mt-2 grid gap-2 text-sm md:grid-cols-4">
-              <p>From: {formatDate(rental.startDate)}</p>
-              <p>To: {formatDate(rental.endDate)}</p>
-              <p>Rent: {formatCurrency(rental.rentAmount)}</p>
-              <p>Deposit: {formatCurrency(rental.depositAmount)}</p>
-            </div>
-
-            {rental.isOverdue ? (
-              <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
-                <p className="font-semibold text-amber-300">Late return alert</p>
-                <p className="mt-1 text-zinc-200">{rental.overdueMessage}</p>
-                <p className="text-zinc-300">
-                  Current fine estimate: {formatCurrency(rental.estimatedLatePenalty)}
-                </p>
-                <p className="text-zinc-300">Release the item as soon as you upload return proof.</p>
+          <div key={rental._id} className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
+            <article className="card-lift animate-fade-up rounded-2xl border border-zinc-700 bg-zinc-900/70 p-4 backdrop-blur-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-display text-lg font-bold">{rental.itemId?.name}</h3>
+                <Badge>{rental.rentalStatus}</Badge>
               </div>
-            ) : null}
-
-            {rental.payment?.receiptNumber ? (
-              <div className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm">
-                <p className="font-semibold text-emerald-300">Payment proof generated</p>
-                <p className="mt-1 text-zinc-200">Receipt: {rental.payment.receiptNumber}</p>
-                <p className="text-zinc-300">Method: {rental.payment.method || "Razorpay"}</p>
-                <p className="text-zinc-300">Paid at: {rental.payment.paidAt ? formatDate(rental.payment.paidAt) : "-"}</p>
-                <p className="text-zinc-300">Amount: {formatCurrency(rental.totalAmount)}</p>
-                <div className="mt-2">
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="ghost" onClick={() => copyReceipt(rental)}>
-                      Copy payment proof
-                    </Button>
-                    <Button variant="muted" onClick={() => downloadBill(rental)}>
-                      Download PDF bill
-                    </Button>
-                  </div>
-                </div>
+              <div className="mt-2 grid gap-2 text-sm md:grid-cols-4">
+                <p>From: {formatDate(rental.startDate)}</p>
+                <p>To: {formatDate(rental.endDate)}</p>
+                <p>Rent: {formatCurrency(rental.rentAmount)}</p>
+                <p>Deposit: {formatCurrency(rental.depositAmount)}</p>
               </div>
-            ) : null}
 
-            {rental.rentalStatus === "AwaitingPayment" ? (
-              <div className="mt-3 rounded-3xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/10 via-zinc-950/90 to-indigo-500/10 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">
-                      Checkout
-                    </p>
-                    <h4 className="font-display text-lg font-bold text-zinc-100">
-                      Rent and deposit are tracked separately
-                    </h4>
-                    <p className="mt-1 max-w-2xl text-sm text-zinc-300">
-                      The rent covers the booking itself. The deposit is held as security and comes
-                      back after the return is confirmed.
-                    </p>
-                  </div>
-                  <Badge tone="warning">Awaiting payment</Badge>
+              {rental.isOverdue ? (
+                <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+                  <p className="font-semibold text-amber-300">Late return alert</p>
+                  <p className="mt-1 text-zinc-200">{rental.overdueMessage}</p>
+                  <p className="text-zinc-300">
+                    Current fine estimate: {formatCurrency(rental.estimatedLatePenalty)}
+                  </p>
+                  <p className="text-zinc-300">Release the item as soon as you upload return proof.</p>
                 </div>
+              ) : null}
 
-                <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1.05fr]">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-200">
-                        Rent charge
-                      </p>
-                      <p className="mt-2 text-3xl font-bold text-zinc-50">
-                        {formatCurrency(rental.rentAmount)}
-                      </p>
-                      <p className="mt-1 text-xs text-zinc-300">
-                        Covers the item for {rental.numberOfDays || 0} day
-                        {Number(rental.numberOfDays || 0) === 1 ? "" : "s"}.
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">
-                        Security deposit
-                      </p>
-                      <p className="mt-2 text-3xl font-bold text-zinc-50">
-                        {formatCurrency(rental.depositAmount)}
-                      </p>
-                      <p className="mt-1 text-xs text-zinc-300">
-                        Held separately and refunded after the rental is completed.
-                      </p>
-                    </div>
-                    <div className="sm:col-span-2 rounded-2xl border border-zinc-700 bg-zinc-950/80 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                            Total due now
-                          </p>
-                          <p className="mt-1 text-sm text-zinc-300">
-                            Rent + deposit are collected together for checkout.
-                          </p>
-                        </div>
-                        <p className="text-2xl font-bold text-white">
-                          {formatCurrency(rental.totalAmount)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="sm:col-span-2 flex flex-wrap gap-2">
-                      <Button onClick={() => createOrder(rental._id)}>Create Razorpay Order</Button>
-                      <Button variant="muted" onClick={() => payWithMockRazorpay(rental._id)}>
-                        Pay with Mock Razorpay
+              {rental.payment?.receiptNumber ? (
+                <div className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm">
+                  <p className="font-semibold text-emerald-300">Payment proof generated</p>
+                  <p className="mt-1 text-zinc-200">Receipt: {rental.payment.receiptNumber}</p>
+                  <p className="text-zinc-300">Method: {rental.payment.method || "Razorpay"}</p>
+                  <p className="text-zinc-300">Paid at: {rental.payment.paidAt ? formatDate(rental.payment.paidAt) : "-"}</p>
+                  <p className="text-zinc-300">Amount: {formatCurrency(rental.totalAmount)}</p>
+                  <div className="mt-2">
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="ghost" onClick={() => copyReceipt(rental)}>
+                        Copy payment proof
+                      </Button>
+                      <Button variant="muted" onClick={() => downloadBill(rental)}>
+                        Download PDF bill
                       </Button>
                     </div>
                   </div>
+                </div>
+              ) : null}
 
-                  <div className="rounded-2xl border border-zinc-700 bg-zinc-950/80 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                      Payment verification
-                    </p>
-                    <p className="mt-1 text-sm text-zinc-300">
-                      For mock checkout or manual testing, fill in the payment identifiers here and
-                      confirm once the gateway response is ready.
-                    </p>
-                    <div className="mt-4 grid gap-3">
-                      <Input
-                        label="Order ID"
-                        value={paymentMeta[rental._id]?.orderId || ""}
-                        onChange={(e) =>
-                          setPaymentMeta((prev) => ({
-                            ...prev,
-                            [rental._id]: { ...prev[rental._id], orderId: e.target.value },
-                          }))
-                        }
-                      />
-                      <Input
-                        label="Payment ID"
-                        value={paymentMeta[rental._id]?.paymentId || ""}
-                        onChange={(e) =>
-                          setPaymentMeta((prev) => ({
-                            ...prev,
-                            [rental._id]: { ...prev[rental._id], paymentId: e.target.value },
-                          }))
-                        }
-                      />
-                      <Input
-                        label="Signature"
-                        value={paymentMeta[rental._id]?.signature || ""}
-                        onChange={(e) =>
-                          setPaymentMeta((prev) => ({
-                            ...prev,
-                            [rental._id]: { ...prev[rental._id], signature: e.target.value },
-                          }))
-                        }
-                      />
+              {rental.rentalStatus === "AwaitingPayment" ? (
+                <div className="mt-3 rounded-3xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/10 via-zinc-950/90 to-indigo-500/10 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">
+                        Checkout
+                      </p>
+                      <h4 className="font-display text-lg font-bold text-zinc-100">
+                        Rent and deposit are tracked separately
+                      </h4>
+                      <p className="mt-1 max-w-2xl text-sm text-zinc-300">
+                        The rent covers the booking itself. The deposit is held as security and comes
+                        back after the return is confirmed.
+                      </p>
                     </div>
-                    <Button className="mt-4 w-full" onClick={() => verifyPayment(rental._id)}>
-                      {paymentMeta[rental._id]?.isMock ? "Complete Mock Payment" : "Verify payment"}
+                    <Badge tone="warning">Awaiting payment</Badge>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1.05fr]">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-200">
+                          Rent charge
+                        </p>
+                        <p className="mt-2 text-3xl font-bold text-zinc-50">
+                          {formatCurrency(rental.rentAmount)}
+                        </p>
+                        <p className="mt-1 text-xs text-zinc-300">
+                          Covers the item for {rental.numberOfDays || 0} day
+                          {Number(rental.numberOfDays || 0) === 1 ? "" : "s"}.
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">
+                          Security deposit
+                        </p>
+                        <p className="mt-2 text-3xl font-bold text-zinc-50">
+                          {formatCurrency(rental.depositAmount)}
+                        </p>
+                        <p className="mt-1 text-xs text-zinc-300">
+                          Held separately and refunded after the rental is completed.
+                        </p>
+                      </div>
+                      <div className="sm:col-span-2 rounded-2xl border border-zinc-700 bg-zinc-950/80 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                              Total due now
+                            </p>
+                            <p className="mt-1 text-sm text-zinc-300">
+                              Rent + deposit are collected together for checkout.
+                            </p>
+                          </div>
+                          <p className="text-2xl font-bold text-white">
+                            {formatCurrency(rental.totalAmount)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="sm:col-span-2 flex flex-wrap gap-2">
+                        <Button onClick={() => createOrder(rental._id)}>Create Razorpay Order</Button>
+                        <Button variant="muted" onClick={() => payWithMockRazorpay(rental._id)}>
+                          Pay with Mock Razorpay
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-zinc-700 bg-zinc-950/80 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                        Payment verification
+                      </p>
+                      <p className="mt-1 text-sm text-zinc-300">
+                        For mock checkout or manual testing, fill in the payment identifiers here and
+                        confirm once the gateway response is ready.
+                      </p>
+                      <div className="mt-4 grid gap-3">
+                        <Input
+                          label="Order ID"
+                          value={paymentMeta[rental._id]?.orderId || ""}
+                          onChange={(e) =>
+                            setPaymentMeta((prev) => ({
+                              ...prev,
+                              [rental._id]: { ...prev[rental._id], orderId: e.target.value },
+                            }))
+                          }
+                        />
+                        <Input
+                          label="Payment ID"
+                          value={paymentMeta[rental._id]?.paymentId || ""}
+                          onChange={(e) =>
+                            setPaymentMeta((prev) => ({
+                              ...prev,
+                              [rental._id]: { ...prev[rental._id], paymentId: e.target.value },
+                            }))
+                          }
+                        />
+                        <Input
+                          label="Signature"
+                          value={paymentMeta[rental._id]?.signature || ""}
+                          onChange={(e) =>
+                            setPaymentMeta((prev) => ({
+                              ...prev,
+                              [rental._id]: { ...prev[rental._id], signature: e.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                      <Button className="mt-4 w-full" onClick={() => verifyPayment(rental._id)}>
+                        {paymentMeta[rental._id]?.isMock ? "Complete Mock Payment" : "Verify payment"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {rental.rentalStatus === "AwaitingPickupProof" ? (
+                <div className="mt-3 rounded-xl border border-zinc-700 bg-zinc-950/80 p-3">
+                  <p className="text-sm font-semibold">Upload before-pickup video proof</p>
+                  <input
+                    className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-900 p-2 text-xs text-zinc-300"
+                    type="file"
+                    accept="video/*"
+                    onChange={(e) => uploadVideo(rental._id, e.target.files?.[0], "before")}
+                  />
+                </div>
+              ) : null}
+
+              {rental.rentalStatus === "Active" ? (
+                <div className="mt-3 rounded-xl border border-zinc-700 bg-zinc-950/80 p-3">
+                  <p className="text-sm font-semibold">Upload after-return video proof</p>
+                  {rental.isOverdue ? (
+                    <p className="mt-1 text-xs text-amber-300">
+                      Late fine is currently {formatCurrency(rental.estimatedLatePenalty)} and increases until return proof is uploaded.
+                    </p>
+                  ) : null}
+                  <input
+                    className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-900 p-2 text-xs text-zinc-300"
+                    type="file"
+                    accept="video/*"
+                    onChange={(e) => uploadVideo(rental._id, e.target.files?.[0], "after")}
+                  />
+                  <div className="mt-3">
+                    <Button variant="muted" onClick={() => releaseItem(rental._id)}>
+                      Release item
                     </Button>
                   </div>
                 </div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {rental.rentalStatus === "AwaitingPickupProof" ? (
-              <div className="mt-3 rounded-xl border border-zinc-700 bg-zinc-950/80 p-3">
-                <p className="text-sm font-semibold">Upload before-pickup video proof</p>
-                <input
-                  className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-900 p-2 text-xs text-zinc-300"
-                  type="file"
-                  accept="video/*"
-                  onChange={(e) => uploadVideo(rental._id, e.target.files?.[0], "before")}
-                />
-              </div>
-            ) : null}
-
-            {rental.rentalStatus === "Active" ? (
-              <div className="mt-3 rounded-xl border border-zinc-700 bg-zinc-950/80 p-3">
-                <p className="text-sm font-semibold">Upload after-return video proof</p>
-                {rental.isOverdue ? (
-                  <p className="mt-1 text-xs text-amber-300">
-                    Late fine is currently {formatCurrency(rental.estimatedLatePenalty)} and increases until return proof is uploaded.
+              {["AwaitingPickupProof", "Active", "ReturnRequested", "Completed"].includes(rental.rentalStatus) ? (
+                <div className="mt-3 rounded-xl border border-zinc-700 bg-zinc-950/80 p-3">
+                  <p className="text-sm font-semibold">Need help? Raise dispute</p>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    You can open a dispute as soon as the item is picked up, without waiting for return.
                   </p>
-                ) : null}
-                <input
-                  className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-900 p-2 text-xs text-zinc-300"
-                  type="file"
-                  accept="video/*"
-                  onChange={(e) => uploadVideo(rental._id, e.target.files?.[0], "after")}
-                />
-                <div className="mt-3">
-                  <Button variant="muted" onClick={() => releaseItem(rental._id)}>
-                    Release item
+                  <Input
+                    label="Reason"
+                    value={disputeDraft[rental._id]?.reason || ""}
+                    onChange={(e) =>
+                      setDisputeDraft((prev) => ({
+                        ...prev,
+                        [rental._id]: { ...prev[rental._id], reason: e.target.value },
+                      }))
+                    }
+                  />
+                  <input
+                    className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-900 p-2 text-xs text-zinc-300"
+                    type="file"
+                    accept="video/*"
+                    onChange={(e) =>
+                      setDisputeDraft((prev) => ({
+                        ...prev,
+                        [rental._id]: { ...prev[rental._id], video: e.target.files?.[0] },
+                      }))
+                    }
+                  />
+                  <Button className="mt-2" variant="ghost" onClick={() => submitDispute(rental._id)}>
+                    Raise dispute
                   </Button>
                 </div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {["AwaitingPickupProof", "Active", "ReturnRequested", "Completed"].includes(rental.rentalStatus) ? (
-              <div className="mt-3 rounded-xl border border-zinc-700 bg-zinc-950/80 p-3">
-                <p className="text-sm font-semibold">Need help? Raise dispute</p>
-                <p className="mt-1 text-xs text-zinc-400">
-                  You can open a dispute as soon as the item is picked up, without waiting for return.
-                </p>
-                <Input
-                  label="Reason"
-                  value={disputeDraft[rental._id]?.reason || ""}
-                  onChange={(e) =>
-                    setDisputeDraft((prev) => ({
-                      ...prev,
-                      [rental._id]: { ...prev[rental._id], reason: e.target.value },
-                    }))
-                  }
-                />
-                <input
-                  className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-900 p-2 text-xs text-zinc-300"
-                  type="file"
-                  accept="video/*"
-                  onChange={(e) =>
-                    setDisputeDraft((prev) => ({
-                      ...prev,
-                      [rental._id]: { ...prev[rental._id], video: e.target.files?.[0] },
-                    }))
-                  }
-                />
-                <Button className="mt-2" variant="ghost" onClick={() => submitDispute(rental._id)}>
-                  Raise dispute
-                </Button>
-              </div>
-            ) : null}
-
-            {rental.rentalStatus === "Completed" ? (
-              <div className="mt-3 rounded-xl border border-zinc-700 bg-zinc-950/80 p-3">
-                {rental.myReview ? (
-                  <div>
-                    <p className="text-sm font-semibold text-emerald-300">Your review is submitted</p>
-                    <p className="mt-1 text-sm text-zinc-300">Rating: {rental.myReview.rating}/5</p>
-                    <p className="mt-1 text-sm text-zinc-300">
-                      Comment: {rental.myReview.comment || "No comment provided."}
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-sm font-semibold">Leave rating/review</p>
-                    <div className="grid gap-2 md:grid-cols-2">
-                      <Input
-                        label="Rating (1-5)"
-                        type="number"
-                        min="1"
-                        max="5"
-                        value={reviewDraft[rental._id]?.rating || "5"}
-                        onChange={(e) =>
-                          setReviewDraft((prev) => ({
-                            ...prev,
-                            [rental._id]: { ...prev[rental._id], rating: e.target.value },
-                          }))
-                        }
-                      />
-                      <Input
-                        label="Comment"
-                        value={reviewDraft[rental._id]?.comment || ""}
-                        onChange={(e) =>
-                          setReviewDraft((prev) => ({
-                            ...prev,
-                            [rental._id]: { ...prev[rental._id], comment: e.target.value },
-                          }))
-                        }
-                      />
+              {rental.rentalStatus === "Completed" ? (
+                <div className="mt-3 rounded-xl border border-zinc-700 bg-zinc-950/80 p-3">
+                  {rental.myReview ? (
+                    <div>
+                      <p className="text-sm font-semibold text-emerald-300">Your review is submitted</p>
+                      <p className="mt-1 text-sm text-zinc-300">Rating: {rental.myReview.rating}/5</p>
+                      <p className="mt-1 text-sm text-zinc-300">
+                        Comment: {rental.myReview.comment || "No comment provided."}
+                      </p>
                     </div>
-                    <Button className="mt-2" onClick={() => submitReview(rental)}>
-                      Submit review
-                    </Button>
-                  </>
-                )}
-              </div>
-            ) : null}
+                  ) : (
+                    <>
+                      <p className="text-sm font-semibold">Leave rating/review</p>
+                      <div className="grid gap-2 md:grid-cols-2">
+                        <Input
+                          label="Rating (1-5)"
+                          type="number"
+                          min="1"
+                          max="5"
+                          value={reviewDraft[rental._id]?.rating || "5"}
+                          onChange={(e) =>
+                            setReviewDraft((prev) => ({
+                              ...prev,
+                              [rental._id]: { ...prev[rental._id], rating: e.target.value },
+                            }))
+                          }
+                        />
+                        <Input
+                          label="Comment"
+                          value={reviewDraft[rental._id]?.comment || ""}
+                          onChange={(e) =>
+                            setReviewDraft((prev) => ({
+                              ...prev,
+                              [rental._id]: { ...prev[rental._id], comment: e.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                      <Button className="mt-2" onClick={() => submitReview(rental)}>
+                        Submit review
+                      </Button>
+                    </>
+                  )}
+                </div>
+              ) : null}
 
-            {rental.rentalStatus === "Disputed" ? (
-              <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-                <p className="text-sm font-semibold text-amber-200">Dispute in progress</p>
-                <p className="mt-1 text-xs text-amber-100/80">
-                  Once the issue is settled, you can complete the dispute and release the item for relisting or deletion.
-                </p>
+              {rental.rentalStatus === "Disputed" ? (
+                <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                  <p className="text-sm font-semibold text-amber-200">Dispute in progress</p>
+                  <p className="mt-1 text-xs text-amber-100/80">
+                    Once the issue is settled, you can complete the dispute and release the item for relisting or deletion.
+                  </p>
+                  <Button
+                    className="mt-3"
+                    variant="ghost"
+                    onClick={() => settleDispute(rental)}
+                    disabled={!rental.dispute?._id}
+                  >
+                    Complete dispute
+                  </Button>
+                </div>
+              ) : null}
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Button
-                  className="mt-3"
-                  variant="ghost"
-                  onClick={() => settleDispute(rental)}
-                  disabled={!rental.dispute?._id}
+                  variant="muted"
+                  onClick={() =>
+                    setActiveChatRentalId((current) => (current === rental._id ? "" : rental._id))
+                  }
                 >
-                  Complete dispute
+                  Open chat
                 </Button>
+                <span className="text-xs text-zinc-400">Lender: {rental.ownerId?.name}</span>
+                <span className="text-xs text-zinc-400">You: {user?.name}</span>
+              </div>
+            </article>
+
+            {activeChatRentalId === rental._id ? (
+              <div className="lg:sticky lg:top-4">
+                <ChatWindow rentalId={rental._id} placement="inline" onClose={() => setActiveChatRentalId("")} />
               </div>
             ) : null}
-
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Button
-                variant="muted"
-                onClick={() =>
-                  setActiveChatRentalId((current) => (current === rental._id ? "" : rental._id))
-                }
-              >
-                Open chat
-              </Button>
-              <span className="text-xs text-zinc-400">Lender: {rental.ownerId?.name}</span>
-              <span className="text-xs text-zinc-400">You: {user?.name}</span>
-            </div>
-          </article>
+          </div>
         ))}
         {!rentals.length ? <p className="text-sm text-zinc-400">No rentals yet.</p> : null}
-        <ChatWindow rentalId={activeChatRentalId} onClose={() => setActiveChatRentalId("")} />
       </div>
     </DashboardLayout>
   );
