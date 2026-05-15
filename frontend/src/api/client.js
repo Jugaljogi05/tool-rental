@@ -1,7 +1,12 @@
 import axios from "axios";
 
+const defaultApiBaseUrl =
+  typeof window !== "undefined" && window.location?.origin
+    ? `${window.location.origin}/api`
+    : "http://localhost:5000/api";
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api",
+  baseURL: import.meta.env.VITE_API_BASE_URL || defaultApiBaseUrl,
 });
 
 apiClient.interceptors.request.use((config) => {

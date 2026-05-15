@@ -17,7 +17,7 @@ const ItemFilters = ({ filters, setFilters, onApply }) => (
       wrapperClassName="md:col-span-2"
     />
     <p className="md:col-span-4 -mt-1 text-xs text-zinc-400">
-      Try natural phrases like "something to tighten bolts" for AI semantic search.
+      Try natural phrases like "something to tighten bolts" and the semantic search will match intent, not just keywords.
     </p>
     <label className="space-y-1">
       <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Category</span>

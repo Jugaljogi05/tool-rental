@@ -1,3 +1,4 @@
+import fs from "fs";
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
@@ -24,6 +25,9 @@ dotenv.config({ path: path.join(path.dirname(fileURLToPath(import.meta.url)), ".
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const frontendDistPath = path.join(__dirname, "..", "..", "frontend", "dist");
+const frontendIndexPath = path.join(frontendDistPath, "index.html");
+const hasFrontendBuild = fs.existsSync(frontendIndexPath);
 const envOrigins = (process.env.FRONTEND_URL || "")
   .split(",")
   .map((origin) => origin.trim())
@@ -71,6 +75,10 @@ app.use(
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 app.get("/", (_req, res) => {
+  if (hasFrontendBuild) {
+    return res.sendFile(frontendIndexPath);
+  }
+
   res.status(200).json({
     status: "success",
     message: "Borrowly API is running.",
@@ -97,6 +105,16 @@ app.use("/api/disputes", disputeRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/notifications", notificationRoutes);
+
+if (hasFrontendBuild) {
+  app.use(express.static(frontendDistPath));
+  app.get("*", (req, res, next) => {
+    if (req.originalUrl.startsWith("/api")) {
+      return next();
+    }
+    return res.sendFile(frontendIndexPath);
+  });
+}
 
 app.use((req, res) => {
   res.status(404).json({

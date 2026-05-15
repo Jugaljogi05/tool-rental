@@ -239,9 +239,10 @@ export const listNearbyItems = catchAsync(async (req, res) => {
 
   let withDistance = semanticCandidates;
   let searchMode = "standard";
+  let semanticResult = null;
 
   if (useSemanticSearch) {
-    const semanticResult = await rankItemsBySemanticSearch({
+    semanticResult = await rankItemsBySemanticSearch({
       query: q,
       items: semanticCandidates,
     });
@@ -275,6 +276,8 @@ export const listNearbyItems = catchAsync(async (req, res) => {
     meta: {
       searchMode,
       semanticSearchUsed: searchMode === "semantic",
+      semanticSearchProvider: semanticResult?.source || "",
+      semanticSearchReason: semanticResult?.reason || "",
     },
   });
 });

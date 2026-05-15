@@ -418,49 +418,116 @@ const RentalHistoryPage = () => {
             ) : null}
 
             {rental.rentalStatus === "AwaitingPayment" ? (
-              <div className="mt-3 rounded-xl border border-zinc-700 bg-zinc-950/80 p-3">
-                <p className="text-sm font-semibold">Deposit + rent payment required</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Button onClick={() => createOrder(rental._id)}>Create Razorpay Order</Button>
-                  <Button variant="muted" onClick={() => payWithMockRazorpay(rental._id)}>
-                    Pay with Mock Razorpay
-                  </Button>
+              <div className="mt-3 rounded-3xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/10 via-zinc-950/90 to-indigo-500/10 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">
+                      Checkout
+                    </p>
+                    <h4 className="font-display text-lg font-bold text-zinc-100">
+                      Rent and deposit are tracked separately
+                    </h4>
+                    <p className="mt-1 max-w-2xl text-sm text-zinc-300">
+                      The rent covers the booking itself. The deposit is held as security and comes
+                      back after the return is confirmed.
+                    </p>
+                  </div>
+                  <Badge tone="warning">Awaiting payment</Badge>
                 </div>
-                <div className="mt-2 grid gap-2 md:grid-cols-3">
-                  <Input
-                    label="Order ID"
-                    value={paymentMeta[rental._id]?.orderId || ""}
-                    onChange={(e) =>
-                      setPaymentMeta((prev) => ({
-                        ...prev,
-                        [rental._id]: { ...prev[rental._id], orderId: e.target.value },
-                      }))
-                    }
-                  />
-                  <Input
-                    label="Payment ID"
-                    value={paymentMeta[rental._id]?.paymentId || ""}
-                    onChange={(e) =>
-                      setPaymentMeta((prev) => ({
-                        ...prev,
-                        [rental._id]: { ...prev[rental._id], paymentId: e.target.value },
-                      }))
-                    }
-                  />
-                  <Input
-                    label="Signature"
-                    value={paymentMeta[rental._id]?.signature || ""}
-                    onChange={(e) =>
-                      setPaymentMeta((prev) => ({
-                        ...prev,
-                        [rental._id]: { ...prev[rental._id], signature: e.target.value },
-                      }))
-                    }
-                  />
+
+                <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1.05fr]">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-200">
+                        Rent charge
+                      </p>
+                      <p className="mt-2 text-3xl font-bold text-zinc-50">
+                        {formatCurrency(rental.rentAmount)}
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-300">
+                        Covers the item for {rental.numberOfDays || 0} day
+                        {Number(rental.numberOfDays || 0) === 1 ? "" : "s"}.
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">
+                        Security deposit
+                      </p>
+                      <p className="mt-2 text-3xl font-bold text-zinc-50">
+                        {formatCurrency(rental.depositAmount)}
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-300">
+                        Held separately and refunded after the rental is completed.
+                      </p>
+                    </div>
+                    <div className="sm:col-span-2 rounded-2xl border border-zinc-700 bg-zinc-950/80 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                            Total due now
+                          </p>
+                          <p className="mt-1 text-sm text-zinc-300">
+                            Rent + deposit are collected together for checkout.
+                          </p>
+                        </div>
+                        <p className="text-2xl font-bold text-white">
+                          {formatCurrency(rental.totalAmount)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="sm:col-span-2 flex flex-wrap gap-2">
+                      <Button onClick={() => createOrder(rental._id)}>Create Razorpay Order</Button>
+                      <Button variant="muted" onClick={() => payWithMockRazorpay(rental._id)}>
+                        Pay with Mock Razorpay
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-zinc-700 bg-zinc-950/80 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                      Payment verification
+                    </p>
+                    <p className="mt-1 text-sm text-zinc-300">
+                      For mock checkout or manual testing, fill in the payment identifiers here and
+                      confirm once the gateway response is ready.
+                    </p>
+                    <div className="mt-4 grid gap-3">
+                      <Input
+                        label="Order ID"
+                        value={paymentMeta[rental._id]?.orderId || ""}
+                        onChange={(e) =>
+                          setPaymentMeta((prev) => ({
+                            ...prev,
+                            [rental._id]: { ...prev[rental._id], orderId: e.target.value },
+                          }))
+                        }
+                      />
+                      <Input
+                        label="Payment ID"
+                        value={paymentMeta[rental._id]?.paymentId || ""}
+                        onChange={(e) =>
+                          setPaymentMeta((prev) => ({
+                            ...prev,
+                            [rental._id]: { ...prev[rental._id], paymentId: e.target.value },
+                          }))
+                        }
+                      />
+                      <Input
+                        label="Signature"
+                        value={paymentMeta[rental._id]?.signature || ""}
+                        onChange={(e) =>
+                          setPaymentMeta((prev) => ({
+                            ...prev,
+                            [rental._id]: { ...prev[rental._id], signature: e.target.value },
+                          }))
+                        }
+                      />
+                    </div>
+                    <Button className="mt-4 w-full" onClick={() => verifyPayment(rental._id)}>
+                      {paymentMeta[rental._id]?.isMock ? "Complete Mock Payment" : "Verify payment"}
+                    </Button>
+                  </div>
                 </div>
-                <Button className="mt-2" onClick={() => verifyPayment(rental._id)}>
-                  {paymentMeta[rental._id]?.isMock ? "Complete Mock Payment" : "Verify payment"}
-                </Button>
               </div>
             ) : null}
 

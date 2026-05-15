@@ -13,7 +13,11 @@ const BorrowerDashboard = () => {
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [searchMeta, setSearchMeta] = useState({ searchMode: "standard", semanticSearchUsed: false });
+  const [searchMeta, setSearchMeta] = useState({
+    searchMode: "standard",
+    semanticSearchUsed: false,
+    semanticSearchProvider: "",
+  });
 
   const loadItems = async () => {
     setLoading(true);
@@ -26,7 +30,13 @@ const BorrowerDashboard = () => {
       };
       const res = await itemApi.listNearby(params);
       setItems(res.data.data.items);
-      setSearchMeta(res.data.meta || { searchMode: "standard", semanticSearchUsed: false });
+      setSearchMeta(
+        res.data.meta || {
+          searchMode: "standard",
+          semanticSearchUsed: false,
+          semanticSearchProvider: "",
+        }
+      );
     } catch (err) {
       setError(err.response?.data?.message || "Unable to load nearby items.");
     } finally {
@@ -50,7 +60,14 @@ const BorrowerDashboard = () => {
         </div>
         {searchMeta.semanticSearchUsed ? (
           <div className="animate-fade-up rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
-            AI semantic search is active for this query.
+            Semantic search is active for this query.
+            {searchMeta.semanticSearchProvider ? (
+              <span className="ml-1 text-cyan-200/80">
+                {searchMeta.semanticSearchProvider.includes("lexical")
+                  ? `Fallback used: ${searchMeta.semanticSearchProvider}`
+                  : `Engine: ${searchMeta.semanticSearchProvider}`}
+              </span>
+            ) : null}
           </div>
         ) : null}
         <ItemFilters filters={filters} setFilters={setFilters} onApply={loadItems} />

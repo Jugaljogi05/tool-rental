@@ -71,7 +71,7 @@ const LandingPage = () => (
               Hyperlocal Rental Network
             </p>
             <h1 className="mt-4 max-w-xl font-display text-4xl font-extrabold leading-tight md:text-5xl">
-              Borrow what you need. Lend what you do not use.
+              Borrow what you need. Lend what you don't.
             </h1>
             <p className="mt-4 max-w-xl text-sm leading-6 text-zinc-300 md:text-base">
               Borrowly connects neighbors for short-term rentals. Discover useful items around you, avoid unnecessary

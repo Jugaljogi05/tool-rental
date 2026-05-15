@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
-import { extractGeminiText, extractJsonObject } from "./responseParsing.js";
+import { extractGeminiText, extractJsonArray, extractJsonObject, extractLooseString } from "./responseParsing.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -167,6 +167,48 @@ const normalizeSuggestedPrice = (value) => {
   if (!Number.isFinite(num) || num < 0) return null;
   return Number(num.toFixed(2));
 };
+
+const extractLooseNumber = (text = "", fieldName = "") => {
+  const input = `${text || ""}`;
+  const escapedField = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`"${escapedField}"\\s*:\\s*("?)(-?\\d+(?:\\.\\d+)?)\\1`, "i");
+  const match = pattern.exec(input);
+  if (!match) return null;
+
+  const num = Number(match[2]);
+  return Number.isFinite(num) ? num : null;
+};
+
+const parseLooseListing = (text = "") => {
+  const rawTitle = extractLooseString(text, "title");
+  const rawDescription = extractLooseString(text, "description");
+  const rawCategory = extractLooseString(text, "category");
+  const rawCondition = extractLooseString(text, "condition");
+  const rawTags = extractJsonArray(text, "tags");
+  const rawSuggestedPrice =
+    extractLooseNumber(text, "suggestedPrice") ??
+    extractLooseNumber(text, "suggested_price") ??
+    extractLooseNumber(text, "price");
+
+  return {
+    title: `${rawTitle || ""}`.trim(),
+    description: `${rawDescription || ""}`.trim(),
+    category: normalizeCategory(rawCategory),
+    tags: normalizeTags(rawTags),
+    condition: normalizeCondition(rawCondition),
+    suggestedPrice: normalizeSuggestedPrice(rawSuggestedPrice),
+  };
+};
+
+const hasUsableListingData = (data = {}) =>
+  Boolean(
+    `${data.title || ""}`.trim() ||
+      `${data.description || ""}`.trim() ||
+      `${data.category || ""}`.trim() ||
+      (Array.isArray(data.tags) && data.tags.length) ||
+      `${data.condition || ""}`.trim() ||
+      data.suggestedPrice !== null && data.suggestedPrice !== undefined
+  );
 
 const runCommand = (bin, args, timeoutMs) =>
   new Promise((resolve, reject) => {
@@ -374,7 +416,18 @@ export const generateListingDetails = async ({ images = [], video = null, hint =
   }
 
   const parsed = extractJsonObject(extracted.rawText);
-  if (!parsed) {
+  const normalized = parsed
+    ? {
+        title: `${parsed.title || ""}`.trim(),
+        description: `${parsed.description || ""}`.trim(),
+        category: normalizeCategory(parsed.category),
+        tags: normalizeTags(parsed.tags),
+        condition: normalizeCondition(parsed.condition),
+        suggestedPrice: normalizeSuggestedPrice(parsed.suggestedPrice),
+      }
+    : parseLooseListing(extracted.rawText);
+
+  if (!hasUsableListingData(normalized)) {
     return {
       ok: false,
       data: emptyListingDetails(),
@@ -382,17 +435,8 @@ export const generateListingDetails = async ({ images = [], video = null, hint =
     };
   }
 
-  const data = {
-    title: `${parsed.title || ""}`.trim(),
-    description: `${parsed.description || ""}`.trim(),
-    category: normalizeCategory(parsed.category),
-    tags: normalizeTags(parsed.tags),
-    condition: normalizeCondition(parsed.condition),
-    suggestedPrice: normalizeSuggestedPrice(parsed.suggestedPrice),
-  };
-
   return {
     ok: true,
-    data,
+    data: normalized,
   };
 };
