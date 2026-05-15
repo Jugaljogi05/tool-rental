@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   disputeApi,
   paymentApi,
@@ -23,18 +23,25 @@ const RentalHistoryPage = () => {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
 
-  const loadRentals = async () => {
+  const loadRentals = useCallback(async () => {
     try {
       const res = await rentalApi.myRentals();
       setRentals(res.data.data.rentals);
     } catch (err) {
       setError(err.response?.data?.message || "Unable to load rental history.");
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadRentals();
-  }, []);
+    const intervalId = window.setInterval(loadRentals, 5000);
+    const handleFocus = () => loadRentals();
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [loadRentals]);
 
   const uploadVideo = async (rentalId, file, type) => {
     if (!file) return;
@@ -666,7 +673,12 @@ const RentalHistoryPage = () => {
             ) : null}
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Button variant="muted" onClick={() => setActiveChatRentalId(rental._id)}>
+              <Button
+                variant="muted"
+                onClick={() =>
+                  setActiveChatRentalId((current) => (current === rental._id ? "" : rental._id))
+                }
+              >
                 Open chat
               </Button>
               <span className="text-xs text-zinc-400">Lender: {rental.ownerId?.name}</span>
@@ -675,7 +687,7 @@ const RentalHistoryPage = () => {
           </article>
         ))}
         {!rentals.length ? <p className="text-sm text-zinc-400">No rentals yet.</p> : null}
-        <ChatWindow rentalId={activeChatRentalId} />
+        <ChatWindow rentalId={activeChatRentalId} onClose={() => setActiveChatRentalId("")} />
       </div>
     </DashboardLayout>
   );

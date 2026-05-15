@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { rentalApi } from "../../api/endpoints";
 import Badge from "../../components/common/Badge";
 import Button from "../../components/common/Button";
@@ -25,7 +25,7 @@ const RequestsPage = () => {
   const [selectedChat, setSelectedChat] = useState("");
   const [error, setError] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const res = await rentalApi.myRentals();
       const openRentals = (res.data.data.rentals || []).filter((rental) =>
@@ -35,11 +35,18 @@ const RequestsPage = () => {
     } catch (err) {
       setError(err.response?.data?.message || "Unable to load rental requests.");
     }
-  };
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
+    const intervalId = window.setInterval(load, 5000);
+    const handleFocus = () => load();
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [load]);
 
   const act = async (fn) => {
     setError("");
@@ -93,7 +100,12 @@ const RequestsPage = () => {
               {rental.rentalStatus === "ReturnRequested" ? (
                 <Button onClick={() => act(() => rentalApi.confirmReturn(rental._id))}>Release item</Button>
               ) : null}
-              <Button variant="muted" onClick={() => setSelectedChat(rental._id)}>
+              <Button
+                variant="muted"
+                onClick={() =>
+                  setSelectedChat((current) => (current === rental._id ? "" : rental._id))
+                }
+              >
                 Open chat
               </Button>
             </div>
@@ -126,7 +138,7 @@ const RequestsPage = () => {
           </article>
         ))}
         {!rentals.length ? <p className="text-sm text-zinc-400">No rental requests yet.</p> : null}
-        <ChatWindow rentalId={selectedChat} />
+        <ChatWindow rentalId={selectedChat} onClose={() => setSelectedChat("")} />
       </div>
     </DashboardLayout>
   );

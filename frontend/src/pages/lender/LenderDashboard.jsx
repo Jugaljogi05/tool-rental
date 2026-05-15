@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { authApi, itemApi, rentalApi } from "../../api/endpoints";
 import Button from "../../components/common/Button";
 import Badge from "../../components/common/Badge";
@@ -12,7 +12,7 @@ const LenderDashboard = () => {
   const [error, setError] = useState("");
   const { setUser } = useAuth();
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [itemsRes, rentalsRes] = await Promise.all([itemApi.myItems(), rentalApi.myRentals()]);
       setItems(itemsRes.data.data.items);
@@ -26,11 +26,18 @@ const LenderDashboard = () => {
     } catch (err) {
       setError(err.response?.data?.message || "Unable to load lender dashboard.");
     }
-  };
+  }, [setUser]);
 
   useEffect(() => {
     loadData();
-  }, []);
+    const intervalId = window.setInterval(loadData, 8000);
+    const handleFocus = () => loadData();
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [loadData]);
 
   useEffect(() => {
     const handleFocus = () => loadData();
