@@ -8,7 +8,7 @@ const ChatWindow = ({ rentalId, onClose, placement = "drawer" }) => {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [error, setError] = useState("");
-  const messagesEndRef = useRef(null);
+  const messagesListRef = useRef(null);
 
   const loadMessages = async () => {
     if (!rentalId) return;
@@ -40,7 +40,12 @@ const ChatWindow = ({ rentalId, onClose, placement = "drawer" }) => {
   };
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const container = messagesListRef.current;
+    if (!container) return;
+
+    window.requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight;
+    });
   }, [messages]);
 
   if (!rentalId) return null;
@@ -66,7 +71,10 @@ const ChatWindow = ({ rentalId, onClose, placement = "drawer" }) => {
         ) : null}
       </div>
       <div className="mt-3 flex min-h-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-900/80 p-2">
+        <div
+          ref={messagesListRef}
+          className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-900/80 p-2"
+        >
           {messages.map((msg) => (
             <div key={msg._id} className="rounded-lg border border-zinc-700 bg-zinc-900 p-2 text-xs">
               <p className="font-semibold">{msg.senderId?.name}</p>
@@ -74,7 +82,6 @@ const ChatWindow = ({ rentalId, onClose, placement = "drawer" }) => {
             </div>
           ))}
           {!messages.length ? <p className="text-xs text-zinc-500">No messages yet.</p> : null}
-          <div ref={messagesEndRef} />
         </div>
         <div className="mt-3 flex gap-2">
           <input
