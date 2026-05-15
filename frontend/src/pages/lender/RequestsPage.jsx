@@ -63,7 +63,7 @@ const RequestsPage = () => {
       <div className="space-y-4">
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         {rentals.map((rental) => (
-          <div key={rental._id} className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
+          <div key={rental._id} className="relative">
             <article className="card-lift animate-fade-up rounded-2xl border border-zinc-700 bg-zinc-900/70 p-4 backdrop-blur-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="font-display text-lg font-bold">{rental.itemId?.name}</h3>
@@ -139,9 +139,7 @@ const RequestsPage = () => {
             </article>
 
             {selectedChat === rental._id ? (
-              <div className="lg:sticky lg:top-4">
-                <ChatWindow rentalId={rental._id} placement="inline" onClose={() => setSelectedChat("")} />
-              </div>
+              <ChatWindow rentalId={rental._id} placement="overlay" onClose={() => setSelectedChat("")} />
             ) : null}
           </div>
         ))}

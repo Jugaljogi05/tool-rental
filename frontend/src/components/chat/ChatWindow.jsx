@@ -48,6 +48,8 @@ const ChatWindow = ({ rentalId, onClose, placement = "drawer" }) => {
   const shellClass =
     placement === "inline"
       ? "animate-fade-up flex h-[640px] min-h-[640px] flex-col overflow-hidden rounded-3xl border border-zinc-700 bg-zinc-950/95 p-4 shadow-2xl shadow-black/40 backdrop-blur-md"
+      : placement === "overlay"
+        ? "animate-fade-up absolute right-4 top-4 z-30 flex h-[min(70vh,640px)] w-[min(420px,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-3xl border border-zinc-700 bg-zinc-950/95 p-4 shadow-2xl shadow-black/60 backdrop-blur-md"
       : "animate-fade-up fixed bottom-4 left-4 right-4 z-50 flex h-[68vh] max-h-[720px] flex-col overflow-hidden rounded-3xl border border-zinc-700 bg-zinc-950/95 p-4 shadow-2xl shadow-black/60 backdrop-blur-md sm:left-auto sm:w-[min(420px,calc(100vw-2rem))] lg:bottom-6 lg:right-6 lg:h-[640px] lg:w-[420px]";
 
   return (
